@@ -1,0 +1,13 @@
+glTF Renderer API
+Copyright (c) 2026 Uncool Labs. All Rights Reserved.
+
+Permission is granted to download and use official, unmodified releases of this software, including using its documented public API as a dependency of another Minecraft mod.
+
+You may not modify, decompile, recompile, redistribute, reupload, sublicense, sell, or publish this software or any modified version of it without prior written permission from the copyright holder.
+
+Mods that only use the documented public API remain the property of their respective authors. This permission does not grant rights to the internal implementation, bundled test content, branding, or other assets included with this software.
+
+This software is provided without warranty of any kind. The copyright holder is not liable for damages arising from its use.
+
+For permissions and support, contact:
+https://discord.gg/JMstSCsJqr

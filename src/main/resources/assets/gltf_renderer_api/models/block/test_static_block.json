@@ -1,0 +1,11 @@
+{
+  "loader": "gltf_renderer_api:gltf",
+  "model": "gltf_renderer_api:models/gltf/test_static_tetrahedron.gltf",
+  "texture": "base",
+  "ambientocclusion": true,
+  "gui_light": "side",
+  "textures": {
+    "base": "minecraft:block/stone",
+    "particle": "minecraft:block/stone"
+  }
+}

@@ -1,0 +1,37 @@
+plugins {
+    id 'java-library'
+}
+
+group = "${rootProject.group}.internal"
+version = native_bundle_version
+
+base {
+    archivesName = native_bundle_artifact_name
+}
+
+configurations {
+    nativeLibraries
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    lwjgl_native_classifiers.split(',').each { classifier ->
+        nativeLibraries("org.lwjgl:lwjgl-meshoptimizer:${lwjgl_compression_version}:${classifier.trim()}") {
+            transitive = false
+        }
+        nativeLibraries("org.lwjgl:lwjgl-ktx:${lwjgl_ktx_version}:${classifier.trim()}") {
+            transitive = false
+        }
+    }
+}
+
+tasks.named('jar', Jar).configure {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from {
+        configurations.nativeLibraries.collect { zipTree(it) }
+    }
+    exclude 'META-INF/MANIFEST.MF', 'META-INF/INDEX.LIST', 'META-INF/versions/**/module-info.class'
+}

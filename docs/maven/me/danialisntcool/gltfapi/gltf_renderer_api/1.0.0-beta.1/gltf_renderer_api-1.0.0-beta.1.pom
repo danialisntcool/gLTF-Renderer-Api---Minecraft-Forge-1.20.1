@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>me.danialisntcool.gltfapi</groupId>
+  <artifactId>gltf_renderer_api</artifactId>
+  <version>1.0.0-beta.1</version>
+  <name>glTF Renderer API</name>
+  <description>High-performance glTF 2.0 rendering API for Minecraft Forge.</description>
+  <url>https://github.com/danialisntcool/gLTF-Renderer-Api---Minecraft-Forge-1.20.1</url>
+  <licenses>
+    <license>
+      <name>All Rights Reserved</name>
+      <url>https://github.com/danialisntcool/gLTF-Renderer-Api---Minecraft-Forge-1.20.1/blob/main/LICENSE.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+  <developers>
+    <developer>
+      <id>danialisntcool</id>
+      <name>danialisntcool</name>
+    </developer>
+  </developers>
+  <scm>
+    <connection>scm:git:https://github.com/danialisntcool/gLTF-Renderer-Api---Minecraft-Forge-1.20.1.git</connection>
+    <developerConnection>scm:git:https://github.com/danialisntcool/gLTF-Renderer-Api---Minecraft-Forge-1.20.1.git</developerConnection>
+    <url>https://github.com/danialisntcool/gLTF-Renderer-Api---Minecraft-Forge-1.20.1</url>
+  </scm>
+</project>

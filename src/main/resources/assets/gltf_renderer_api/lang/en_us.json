@@ -1,0 +1,5 @@
+{
+  "entity.gltf_renderer_api.test_character": "glTF Test Character",
+  "item.gltf_renderer_api.test_character_spawn_egg": "glTF Test Character Spawn Egg",
+  "block.gltf_renderer_api.test_static_block": "glTF Static Model Test"
+}
