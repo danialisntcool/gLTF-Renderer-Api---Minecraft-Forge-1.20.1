@@ -113,7 +113,7 @@ public final class GltfLoader {
         }
         active[nodeIndex] = true;
         GltfNode node = nodes.get(nodeIndex);
-        Matrix4f local = node.localTransform(node.pose());
+        Matrix4f local = node.localTransform(node.pose(), null);
         transforms[nodeIndex] = node.parent() < 0
                 ? local
                 : new Matrix4f(defaultWorldTransform(node.parent(), nodes, transforms, active)).mul(local);

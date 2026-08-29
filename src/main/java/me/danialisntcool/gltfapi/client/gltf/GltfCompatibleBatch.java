@@ -7,6 +7,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import me.danialisntcool.gltfapi.GltfRendererApi;
+import me.danialisntcool.gltfapi.api.client.GltfNodeRotationOffsets;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.ShaderInstance;
@@ -33,10 +34,12 @@ public final class GltfCompatibleBatch {
     public void add(GltfModel model, Matrix4f pose, Matrix3f normal,
                     MultiBufferSource buffers, int packedLight, int packedOverlay,
                     me.danialisntcool.gltfapi.api.client.GltfRenderOptions options) {
+        GltfNodeRotationOffsets rotationOffsets = options.nodeRotationOffsets();
         StateKey stateKey = new StateKey(model, options.animation(),
-                Float.floatToIntBits(options.animationTimeSeconds()), options.scene());
+                Float.floatToIntBits(options.animationTimeSeconds()), options.scene(),
+                rotationOffsets, rotationOffsets.revision());
         GltfRenderState state = states.computeIfAbsent(stateKey, ignored -> model.renderState(
-                options.animation(), options.animationTimeSeconds(), options.scene()));
+                options.animation(), options.animationTimeSeconds(), options.scene(), rotationOffsets));
         for (GltfPrimitive primitive : model.primitives()) {
             if (!state.visibleNodes().get(primitive.nodeIndex())) {
                 continue;
@@ -207,6 +210,7 @@ public final class GltfCompatibleBatch {
                                    float distanceSquared) {
     }
 
-    private record StateKey(GltfModel model, String animation, int animationTimeBits, String scene) {
+    private record StateKey(GltfModel model, String animation, int animationTimeBits, String scene,
+                            GltfNodeRotationOffsets rotationOffsets, long rotationRevision) {
     }
 }

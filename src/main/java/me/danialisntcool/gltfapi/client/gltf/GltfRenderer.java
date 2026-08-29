@@ -34,7 +34,7 @@ public final class GltfRenderer {
                               int packedLight, int packedOverlay, GltfRenderOptions options) {
         RenderSystem.assertOnRenderThread();
         GltfRenderState state = model.renderState(
-                options.animation(), options.animationTimeSeconds(), options.scene());
+                options.animation(), options.animationTimeSeconds(), options.scene(), options.nodeRotationOffsets());
         boolean shaderPack = GltfShaderPackCompat.isShaderPackInUse();
         boolean shadowPass = GltfShaderPackCompat.isRenderingShadowPass();
         if (!model.hasBlendedPrimitives()) {

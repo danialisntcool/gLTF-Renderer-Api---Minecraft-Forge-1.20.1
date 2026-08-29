@@ -71,6 +71,12 @@ public final class GltfApi {
                 .orElseGet(List::of);
     }
 
+    public static List<String> nodeNames(GltfModelHandle handle) {
+        return GltfModelManager.getInstance().getModel(handle.location())
+                .map(GltfModel::nodeNames)
+                .orElseGet(List::of);
+    }
+
     public static boolean render(GltfModelHandle handle, GltfRenderContext context) {
         Optional<GltfModel> model = GltfModelManager.getInstance().getModel(handle.location());
         if (model.isEmpty()) {
@@ -160,7 +166,7 @@ public final class GltfApi {
     }
 
     private static boolean isContextVisible(GltfRenderContext context, GltfModel model) {
-        if (context.frustum() == null) {
+        if (context.frustum() == null || !context.options().nodeRotationOffsets().isEmpty()) {
             return true;
         }
         GltfModelStatistics statistics = model.statistics();

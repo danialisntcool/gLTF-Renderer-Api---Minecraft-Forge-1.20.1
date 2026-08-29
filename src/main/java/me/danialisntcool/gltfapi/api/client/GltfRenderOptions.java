@@ -14,7 +14,8 @@ public record GltfRenderOptions(
         Vector3f scale,
         String animation,
         float animationTimeSeconds,
-        String scene
+        String scene,
+        GltfNodeRotationOffsets nodeRotationOffsets
 ) {
     public static final GltfRenderOptions DEFAULT = new GltfRenderOptions(
             new Vector3f(),
@@ -22,7 +23,14 @@ public record GltfRenderOptions(
             new Vector3f(1.0F),
             null,
             0.0F,
-            null);
+            null,
+            GltfNodeRotationOffsets.empty());
+
+    public GltfRenderOptions(Vector3f translation, Quaternionf rotation, Vector3f scale,
+                             String animation, float animationTimeSeconds, String scene) {
+        this(translation, rotation, scale, animation, animationTimeSeconds, scene,
+                GltfNodeRotationOffsets.empty());
+    }
 
     public GltfRenderOptions(Vector3f translation, Quaternionf rotation, Vector3f scale,
                              String animation, float animationTimeSeconds) {
@@ -33,6 +41,7 @@ public record GltfRenderOptions(
         translation = new Vector3f(translation);
         rotation = new Quaternionf(rotation);
         scale = new Vector3f(scale);
+        nodeRotationOffsets = java.util.Objects.requireNonNull(nodeRotationOffsets);
     }
 
     @Override
@@ -51,15 +60,22 @@ public record GltfRenderOptions(
     }
 
     public GltfRenderOptions withAnimation(String animation, float timeSeconds) {
-        return new GltfRenderOptions(translation, rotation, scale, animation, timeSeconds, scene);
+        return new GltfRenderOptions(translation, rotation, scale, animation, timeSeconds, scene, nodeRotationOffsets);
     }
 
     public GltfRenderOptions withTransform(Vector3f translation, Quaternionf rotation, Vector3f scale) {
-        return new GltfRenderOptions(translation, rotation, scale, animation, animationTimeSeconds, scene);
+        return new GltfRenderOptions(translation, rotation, scale, animation, animationTimeSeconds, scene,
+                nodeRotationOffsets);
     }
 
     public GltfRenderOptions withScene(String scene) {
-        return new GltfRenderOptions(translation, rotation, scale, animation, animationTimeSeconds, scene);
+        return new GltfRenderOptions(translation, rotation, scale, animation, animationTimeSeconds, scene,
+                nodeRotationOffsets);
+    }
+
+    public GltfRenderOptions withNodeRotationOffsets(GltfNodeRotationOffsets nodeRotationOffsets) {
+        return new GltfRenderOptions(translation, rotation, scale, animation, animationTimeSeconds, scene,
+                nodeRotationOffsets);
     }
 
     void apply(PoseStack poseStack) {

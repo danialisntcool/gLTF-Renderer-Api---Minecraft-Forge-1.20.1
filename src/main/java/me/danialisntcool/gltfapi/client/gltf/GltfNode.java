@@ -2,6 +2,7 @@ package me.danialisntcool.gltfapi.client.gltf;
 
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
+import org.joml.Quaternionfc;
 import org.joml.Vector3f;
 
 import java.util.Arrays;
@@ -27,11 +28,16 @@ record GltfNode(
         weights = Arrays.copyOf(weights, weights.length);
     }
 
-    Matrix4f localTransform(NodePose pose) {
+    Matrix4f localTransform(NodePose pose, Quaternionfc rotationOffset) {
         if (matrix != null) {
-            return new Matrix4f(matrix);
+            Matrix4f result = new Matrix4f(matrix);
+            return rotationOffset == null ? result : result.rotate(rotationOffset);
         }
-        return new Matrix4f().translation(pose.translation()).rotate(pose.rotation()).scale(pose.scale());
+        Matrix4f result = new Matrix4f().translation(pose.translation()).rotate(pose.rotation());
+        if (rotationOffset != null) {
+            result.rotate(rotationOffset);
+        }
+        return result.scale(pose.scale());
     }
 
     NodePose pose() {

@@ -1,8 +1,10 @@
 package me.danialisntcool.gltfapi.client.gltf;
 
 import me.danialisntcool.gltfapi.api.client.GltfModelStatistics;
+import me.danialisntcool.gltfapi.api.client.GltfNodeRotationOffsets;
 import net.minecraft.resources.ResourceLocation;
 import org.joml.Matrix4f;
+import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 import java.util.List;
@@ -60,15 +62,21 @@ public final class GltfModel implements AutoCloseable {
         return scenes.stream().map(GltfScene::name).toList();
     }
 
-    GltfRenderState renderState(String animationName, float animationTime, String sceneName) {
-        if (animationName == null) {
-            return staticRenderStates.computeIfAbsent(sceneName == null ? "" : sceneName,
-                    key -> calculateRenderState(null, 0.0F, sceneName));
-        }
-        return calculateRenderState(animationName, animationTime, sceneName);
+    public List<String> nodeNames() {
+        return nodes.stream().map(GltfNode::name).toList();
     }
 
-    private GltfRenderState calculateRenderState(String animationName, float animationTime, String sceneName) {
+    GltfRenderState renderState(String animationName, float animationTime, String sceneName,
+                                GltfNodeRotationOffsets rotationOffsets) {
+        if (animationName == null && rotationOffsets.isEmpty()) {
+            return staticRenderStates.computeIfAbsent(sceneName == null ? "" : sceneName,
+                    key -> calculateRenderState(null, 0.0F, sceneName, rotationOffsets));
+        }
+        return calculateRenderState(animationName, animationTime, sceneName, rotationOffsets);
+    }
+
+    private GltfRenderState calculateRenderState(String animationName, float animationTime, String sceneName,
+                                                 GltfNodeRotationOffsets rotationOffsets) {
         GltfNode.NodePose[] poses = new GltfNode.NodePose[nodes.size()];
         for (int index = 0; index < nodes.size(); index++) {
             poses[index] = nodes.get(index).pose();
@@ -83,8 +91,9 @@ public final class GltfModel implements AutoCloseable {
         }
         Matrix4f[] transforms = new Matrix4f[nodes.size()];
         boolean[] active = new boolean[nodes.size()];
+        Quaternionf rotationOffset = new Quaternionf();
         for (int index = 0; index < nodes.size(); index++) {
-            worldTransform(index, poses, transforms, active);
+            worldTransform(index, poses, transforms, active, rotationOffsets, rotationOffset);
         }
         int sceneIndex = defaultScene;
         if (sceneName != null) {
@@ -187,7 +196,8 @@ public final class GltfModel implements AutoCloseable {
         return new GltfModelStatistics(primitives.size(), vertices, triangles, gpuBytes, minimum, maximum);
     }
 
-    private Matrix4f worldTransform(int index, GltfNode.NodePose[] poses, Matrix4f[] transforms, boolean[] active) {
+    private Matrix4f worldTransform(int index, GltfNode.NodePose[] poses, Matrix4f[] transforms, boolean[] active,
+                                    GltfNodeRotationOffsets rotationOffsets, Quaternionf rotationOffset) {
         if (transforms[index] != null) {
             return transforms[index];
         }
@@ -196,10 +206,12 @@ public final class GltfModel implements AutoCloseable {
         }
         active[index] = true;
         GltfNode node = nodes.get(index);
-        Matrix4f local = node.localTransform(poses[index]);
+        boolean hasRotationOffset = rotationOffsets.resolve(index, node.name(), rotationOffset);
+        Matrix4f local = node.localTransform(poses[index], hasRotationOffset ? rotationOffset : null);
         transforms[index] = node.parent() < 0
                 ? local
-                : new Matrix4f(worldTransform(node.parent(), poses, transforms, active)).mul(local);
+                : new Matrix4f(worldTransform(node.parent(), poses, transforms, active,
+                rotationOffsets, rotationOffset)).mul(local);
         active[index] = false;
         return transforms[index];
     }
