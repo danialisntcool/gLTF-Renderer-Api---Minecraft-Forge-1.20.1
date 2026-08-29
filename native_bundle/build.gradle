@@ -30,6 +30,15 @@ dependencies {
 
 tasks.named('jar', Jar).configure {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from(rootProject.file('LICENSE.txt')) {
+        into 'META-INF'
+    }
+    from(rootProject.file('THIRD_PARTY_NOTICES.txt')) {
+        into 'META-INF'
+    }
+    from(rootProject.file('third_party_licenses')) {
+        into 'META-INF/third_party_licenses'
+    }
     from {
         configurations.nativeLibraries.collect { zipTree(it) }
     }

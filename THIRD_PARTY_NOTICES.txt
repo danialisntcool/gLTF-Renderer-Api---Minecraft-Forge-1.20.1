@@ -1,0 +1,40 @@
+glTF Renderer API Third-Party Notices
+
+The glTF Renderer API contains or distributes the following third-party components. These components are not covered by the Uncool Labs proprietary license. Each remains governed by its own license.
+
+Drako 1.4.2
+Project: https://github.com/fileformat-drako/FileFormat.Drako-for-Java
+Publisher: FileFormat / Openize Pty Ltd.
+License: MIT License
+License source: https://raw.githubusercontent.com/fileformat-drako/FileFormat.Drako-for-Java/main/LICENSE
+The MIT License text is included in third_party_licenses/MIT.txt.
+
+Lightweight Java Game Library bindings
+Components: lwjgl-ktx 3.3.2 and lwjgl-meshoptimizer 3.3.1
+Project: https://github.com/LWJGL/lwjgl3
+Copyright (c) 2012-present Lightweight Java Game Library. All rights reserved.
+License: BSD 3-Clause License
+The complete license text is included in third_party_licenses/LWJGL-BSD-3-Clause.txt.
+
+meshoptimizer
+Project: https://github.com/zeux/meshoptimizer
+Copyright (c) 2016-2026 Arseny Kapoulkine
+License: MIT License
+The MIT License text is included in third_party_licenses/MIT.txt.
+
+KTX-Software and Basis Universal transcoding support
+Project: https://github.com/KhronosGroup/KTX-Software
+Copyright holders include The Khronos Group Inc., Mark Callow, and KTX-Software contributors.
+License: Apache License 2.0 for the KTX library components distributed here.
+The complete license text is included in third_party_licenses/Apache-2.0.txt.
+KTX-Software contains additional separately licensed development and test material. The glTF Renderer API native bundle distributes the LWJGL-built KTX runtime libraries, not the KTX-Software source tree or its test assets.
+
+Mini Simple Character (Free Demo + Animations)
+Author: joaobaltieri
+Author profile: https://sketchfab.com/joaobaltieri
+Source: https://sketchfab.com/3d-models/mini-simple-character-free-demo-animations-ffcb3490d35148a5951d3b32d1e5a7cb
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+License: https://creativecommons.org/licenses/by/4.0/
+The asset is packaged as optional test content for the renderer. Uncool Labs does not claim authorship or exclusive rights over it.
+
+Minecraft, Minecraft Forge, Embeddium, Oculus, Iris, and other names belong to their respective owners. Their mention indicates compatibility or a development dependency and does not imply ownership or endorsement.

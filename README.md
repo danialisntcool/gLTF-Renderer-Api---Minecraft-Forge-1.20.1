@@ -67,6 +67,10 @@ The JAR file is written to the `build/libs` directory.
 
 ## License and support
 
-Copyright (c) 2026 Uncool Labs. All Rights Reserved. For details regarding permitted API use and restrictions, see `LICENSE.txt`.
+Copyright (c) 2026 Uncool Labs. All Rights Reserved.
+
+This project is proprietary source-available software, not open-source software. Its source can be inspected publicly, and official unmodified releases may be used directly or through the documented API under the terms in `LICENSE.txt`. Modification and redistribution are restricted unless Uncool Labs grants written permission.
+
+Bundled third-party libraries and test assets remain under their own licenses. See `THIRD_PARTY_NOTICES.txt` for attribution and license details.
 
 Support: https://discord.gg/JMstSCsJqr

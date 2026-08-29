@@ -59,6 +59,15 @@ java {
 
 tasks.named('sourcesJar').configure {
     dependsOn tasks.named('generateModMetadata')
+    from('LICENSE.txt') {
+        into 'META-INF'
+    }
+    from('THIRD_PARTY_NOTICES.txt') {
+        into 'META-INF'
+    }
+    from('third_party_licenses') {
+        into 'META-INF/third_party_licenses'
+    }
 }
 
 println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
@@ -250,6 +259,15 @@ tasks.named('processResources', ProcessResources).configure {
 // Example for how to get properties into the manifest for reading at runtime.
 tasks.named('jar', Jar).configure {
     archiveClassifier = 'slim'
+    from('LICENSE.txt') {
+        into 'META-INF'
+    }
+    from('THIRD_PARTY_NOTICES.txt') {
+        into 'META-INF'
+    }
+    from('third_party_licenses') {
+        into 'META-INF/third_party_licenses'
+    }
     manifest {
         attributes([
                 'Specification-Title'     : mod_id,
@@ -324,6 +342,15 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.named('jarJar', Jar).configure {
     archiveClassifier = ''
+    from('LICENSE.txt') {
+        into 'META-INF'
+    }
+    from('THIRD_PARTY_NOTICES.txt') {
+        into 'META-INF'
+    }
+    from('third_party_licenses') {
+        into 'META-INF/third_party_licenses'
+    }
 }
 
 tasks.register('ktxDecoderSmoke', JavaExec) {
