@@ -52,6 +52,9 @@ public record GltfUnbakedGeometry(ResourceLocation model, String texture, boolea
             loaded.close();
         }
         Map<Direction, List<BakedQuad>> culled = new EnumMap<>(Direction.class);
+        for (Direction direction : Direction.values()) {
+            culled.put(direction, List.of());
+        }
         RenderTypeGroup renderTypes = context.getRenderTypeHint() == null
                 ? RenderTypeGroup.EMPTY : context.getRenderType(context.getRenderTypeHint());
         if (renderTypes.isEmpty()) {
