@@ -25,7 +25,7 @@ public class GltfItemRenderer extends BlockEntityWithoutLevelRenderer {
     @Override
     public final void renderByItem(ItemStack stack, ItemDisplayContext displayContext, PoseStack poseStack,
                                    MultiBufferSource buffers, int packedLight, int packedOverlay) {
-        GltfApi.render(model, new GltfRenderContext(
+        GltfApi.renderBuffered(model, new GltfRenderContext(
                 poseStack,
                 buffers,
                 packedLight,

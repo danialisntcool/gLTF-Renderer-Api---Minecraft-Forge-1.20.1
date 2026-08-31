@@ -78,6 +78,14 @@ public final class GltfApi {
     }
 
     public static boolean render(GltfModelHandle handle, GltfRenderContext context) {
+        return renderInternal(handle, context, false);
+    }
+
+    public static boolean renderBuffered(GltfModelHandle handle, GltfRenderContext context) {
+        return renderInternal(handle, context, true);
+    }
+
+    private static boolean renderInternal(GltfModelHandle handle, GltfRenderContext context, boolean buffered) {
         Optional<GltfModel> model = GltfModelManager.getInstance().getModel(handle.location());
         if (model.isEmpty()) {
             return false;
@@ -88,13 +96,23 @@ public final class GltfApi {
         context.poseStack().pushPose();
         try {
             context.options().apply(context.poseStack());
-            GltfRenderer.render(
-                    model.get(),
-                    context.poseStack(),
-                    context.buffers(),
-                    context.packedLight(),
-                    context.packedOverlay(),
-                    context.options());
+            if (buffered) {
+                GltfRenderer.renderBuffered(
+                        model.get(),
+                        context.poseStack(),
+                        context.buffers(),
+                        context.packedLight(),
+                        context.packedOverlay(),
+                        context.options());
+            } else {
+                GltfRenderer.render(
+                        model.get(),
+                        context.poseStack(),
+                        context.buffers(),
+                        context.packedLight(),
+                        context.packedOverlay(),
+                        context.options());
+            }
         } catch (RuntimeException | LinkageError exception) {
             throw renderFailure("model " + handle.location(), exception);
         } finally {

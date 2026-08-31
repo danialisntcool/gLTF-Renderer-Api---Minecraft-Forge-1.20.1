@@ -1,6 +1,5 @@
 package me.danialisntcool.gltfapi.api.client.render;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import me.danialisntcool.gltfapi.api.client.GltfApi;
 import me.danialisntcool.gltfapi.api.client.GltfModelHandle;
 import me.danialisntcool.gltfapi.api.client.GltfRenderContext;
@@ -25,14 +24,16 @@ public final class GltfGuiRenderer {
                                  float x, float y, float depth, float scale, GltfRenderOptions options) {
         graphics.flush();
         graphics.pose().pushPose();
-        graphics.pose().translate(x, y, depth);
-        graphics.pose().scale(scale, -scale, scale);
-        RenderSystem.enableDepthTest();
-        boolean rendered = GltfApi.render(model, new GltfRenderContext(
-                graphics.pose(), graphics.bufferSource(), LightTexture.FULL_BRIGHT,
-                OverlayTexture.NO_OVERLAY, options));
-        graphics.flush();
-        graphics.pose().popPose();
-        return rendered;
+        try {
+            graphics.pose().translate(x, y, depth);
+            graphics.pose().scale(scale, -scale, scale);
+            boolean rendered = GltfApi.renderBuffered(model, new GltfRenderContext(
+                    graphics.pose(), graphics.bufferSource(), LightTexture.FULL_BRIGHT,
+                    OverlayTexture.NO_OVERLAY, options));
+            graphics.flush();
+            return rendered;
+        } finally {
+            graphics.pose().popPose();
+        }
     }
 }

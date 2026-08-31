@@ -85,6 +85,47 @@ public final class GltfRenderer {
         render(model, poseStack, buffers, packedLight, packedOverlay, GltfRenderOptions.DEFAULT);
     }
 
+    public static void renderBuffered(GltfModel model, PoseStack poseStack, MultiBufferSource buffers,
+                                      int packedLight, int packedOverlay, GltfRenderOptions options) {
+        RenderSystem.assertOnRenderThread();
+        GltfRenderState state = model.renderState(
+                options.animation(), options.animationTimeSeconds(), options.scene(), options.nodeRotationOffsets());
+        boolean shadowPass = GltfShaderPackCompat.isRenderingShadowPass();
+        if (!model.hasBlendedPrimitives()) {
+            for (GltfPrimitive primitive : model.primitives()) {
+                if (!state.visibleNodes().get(primitive.nodeIndex())) {
+                    continue;
+                }
+                Matrix4f nodeTransform = state.transforms()[primitive.nodeIndex()];
+                for (Matrix4f instance : primitive.instances()) {
+                    renderCompatible(model, state, primitive, new Matrix4f(nodeTransform).mul(instance),
+                            poseStack, buffers, packedLight, packedOverlay, shadowPass);
+                }
+            }
+            return;
+        }
+        List<RenderCall> calls = new ArrayList<>();
+        for (GltfPrimitive primitive : model.primitives()) {
+            if (!state.visibleNodes().get(primitive.nodeIndex())) {
+                continue;
+            }
+            Matrix4f nodeTransform = state.transforms()[primitive.nodeIndex()];
+            for (Matrix4f instance : primitive.instances()) {
+                Matrix4f transform = new Matrix4f(nodeTransform).mul(instance);
+                Vector3f center = primitiveCenter(primitive, transform, poseStack.last().pose());
+                calls.add(new RenderCall(primitive, transform, center.lengthSquared()));
+            }
+        }
+        calls.sort(Comparator.comparing((RenderCall call) -> call.primitive().material().alphaMode()
+                        == GltfMaterial.AlphaMode.BLEND)
+                .thenComparing(call -> call.primitive().material().alphaMode() == GltfMaterial.AlphaMode.BLEND
+                        ? -call.distanceSquared() : 0.0F));
+        for (RenderCall call : calls) {
+            renderCompatible(model, state, call.primitive(), call.transform(), poseStack, buffers,
+                    packedLight, packedOverlay, shadowPass);
+        }
+    }
+
     public static void render(GltfModel model, PoseStack poseStack, MultiBufferSource buffers, int packedLight) {
         render(model, poseStack, buffers, packedLight, OverlayTexture.NO_OVERLAY);
     }
