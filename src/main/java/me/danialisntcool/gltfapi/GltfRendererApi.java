@@ -1,16 +1,13 @@
 package me.danialisntcool.gltfapi;
 
 import com.mojang.logging.LogUtils;
-import me.danialisntcool.gltfapi.client.GltfRendererApiClient;
 import me.danialisntcool.gltfapi.test.TestCharacter;
 import me.danialisntcool.gltfapi.test.TestContent;
 import me.danialisntcool.gltfapi.generated.ModMetadata;
 import net.minecraft.world.item.CreativeModeTabs;
-import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.event.entity.EntityAttributeCreationEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.fml.CrashReportCallables;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
@@ -29,8 +26,6 @@ public final class GltfRendererApi {
         TestContent.register(modEventBus);
         modEventBus.addListener(this::createEntityAttributes);
         modEventBus.addListener(this::buildCreativeTab);
-        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
-                GltfRendererApiClient.initialize(modEventBus));
     }
 
     private void createEntityAttributes(EntityAttributeCreationEvent event) {
