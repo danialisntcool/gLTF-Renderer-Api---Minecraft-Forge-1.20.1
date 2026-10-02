@@ -2,6 +2,8 @@ package me.danialisntcool.gltfapi.client.gltf;
 
 import me.danialisntcool.gltfapi.api.client.GltfModelStatistics;
 import me.danialisntcool.gltfapi.api.client.GltfNodeRotationOffsets;
+import me.danialisntcool.gltfapi.api.client.GltfBounds;
+import me.danialisntcool.gltfapi.api.client.GltfRenderOptions;
 import net.minecraft.resources.ResourceLocation;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
@@ -11,6 +13,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.BitSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import me.danialisntcool.gltfapi.generated.ModMetadata;
 
 public final class GltfModel implements AutoCloseable {
     private final ResourceLocation location;
@@ -23,7 +27,9 @@ public final class GltfModel implements AutoCloseable {
     private final List<GltfAnimation> animations;
     private final List<GltfSkin> skins;
     private final Map<String, GltfRenderState> staticRenderStates = new HashMap<>();
+    private final Map<PoseKey, GltfRenderState> recentRenderStates = new LinkedHashMap<>(16, 0.75F, true);
     private final boolean hasBlendedPrimitives;
+    private final boolean hasDeformation;
 
     public GltfModel(ResourceLocation location, List<GltfPrimitive> primitives,
                      Map<ResourceLocation, GltfEmbeddedTexture> embeddedTextures, List<GltfNode> nodes,
@@ -39,6 +45,8 @@ public final class GltfModel implements AutoCloseable {
         this.skins = List.copyOf(skins);
         this.hasBlendedPrimitives = primitives.stream()
                 .anyMatch(primitive -> primitive.material().alphaMode() == GltfMaterial.AlphaMode.BLEND);
+        this.hasDeformation = primitives.stream()
+                .anyMatch(primitive -> primitive.skinIndex() >= 0 || primitive.morphTargetCount() > 0);
         this.statistics = calculateStatistics();
     }
 
@@ -52,6 +60,19 @@ public final class GltfModel implements AutoCloseable {
 
     public GltfModelStatistics statistics() {
         return statistics;
+    }
+
+    public boolean supportsIconCache(GltfRenderOptions options) {
+        return options.animation() == null && options.nodeRotationOffsets().isEmpty()
+                && !hasBlendedPrimitives && !hasDeformation
+                && me.danialisntcool.gltfapi.api.client.GltfMaterialRenderers.find(location) == null;
+    }
+
+    public GltfBounds renderBounds(GltfRenderOptions options) {
+        GltfRenderState state = renderState(options.animation(), options.animationTimeSeconds(),
+                options.scene(), options.nodeRotationOffsets());
+        if (state.bounds == null) state.bounds = GltfPosedBounds.calculate(this, state);
+        return state.bounds;
     }
 
     public List<String> animationNames() {
@@ -69,10 +90,36 @@ public final class GltfModel implements AutoCloseable {
     GltfRenderState renderState(String animationName, float animationTime, String sceneName,
                                 GltfNodeRotationOffsets rotationOffsets) {
         if (animationName == null && rotationOffsets.isEmpty()) {
-            return staticRenderStates.computeIfAbsent(sceneName == null ? "" : sceneName,
-                    key -> calculateRenderState(null, 0.0F, sceneName, rotationOffsets));
+            String sceneKey = sceneName == null ? "" : sceneName;
+            GltfRenderState cached = staticRenderStates.get(sceneKey);
+            if (cached != null) {
+                GltfRenderMetrics.poseHit();
+                return cached;
+            }
+            GltfRenderState state = calculateRenderState(null, 0.0F, sceneName, rotationOffsets);
+            staticRenderStates.put(sceneKey, state);
+            return state;
         }
-        return calculateRenderState(animationName, animationTime, sceneName, rotationOffsets);
+        PoseKey key = new PoseKey(animationName, animationName == null ? 0 : Float.floatToIntBits(animationTime),
+                sceneName, rotationOffsets.isEmpty() ? null : rotationOffsets,
+                rotationOffsets.isEmpty() ? 0L : rotationOffsets.revision());
+        GltfRenderState cached = recentRenderStates.get(key);
+        if (cached != null) {
+            GltfRenderMetrics.poseHit();
+            return cached;
+        }
+        GltfRenderState state = calculateRenderState(animationName, animationTime, sceneName, rotationOffsets);
+        recentRenderStates.put(key, state);
+        while (recentRenderStates.size() > Math.max(1, ModMetadata.POSE_CACHE_ENTRIES)) {
+            var iterator = recentRenderStates.keySet().iterator();
+            iterator.next();
+            iterator.remove();
+        }
+        return state;
+    }
+
+    private record PoseKey(String animation, int time, String scene,
+                           GltfNodeRotationOffsets rotations, long revision) {
     }
 
     private GltfRenderState calculateRenderState(String animationName, float animationTime, String sceneName,
@@ -162,6 +209,8 @@ public final class GltfModel implements AutoCloseable {
         for (GltfPrimitive primitive : primitives) {
             primitive.close();
         }
+        staticRenderStates.clear();
+        recentRenderStates.clear();
     }
 
     private GltfModelStatistics calculateStatistics() {

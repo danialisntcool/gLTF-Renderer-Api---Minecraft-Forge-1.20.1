@@ -17,6 +17,8 @@ public final class GltfNodeRotationOffsets {
     private final Map<Integer, Quaternionf> indexed = new HashMap<>();
     private final boolean mutable;
     private long revision;
+    private GltfNodeRotationOffsets snapshot;
+    private long snapshotRevision = -1;
 
     public GltfNodeRotationOffsets() {
         this(true);
@@ -83,6 +85,19 @@ public final class GltfNodeRotationOffsets {
 
     public long revision() {
         return revision;
+    }
+
+    public GltfNodeRotationOffsets snapshot() {
+        if (!mutable || isEmpty()) return isEmpty() ? EMPTY : this;
+        if (snapshot == null || snapshotRevision != revision) {
+            GltfNodeRotationOffsets copy = new GltfNodeRotationOffsets(false);
+            named.forEach((key, rotation) -> copy.named.put(key, new Quaternionf(rotation)));
+            indexed.forEach((key, rotation) -> copy.indexed.put(key, new Quaternionf(rotation)));
+            copy.revision = revision;
+            snapshot = copy;
+            snapshotRevision = revision;
+        }
+        return snapshot;
     }
 
     public boolean resolve(int nodeIndex, String nodeName, Quaternionf destination) {

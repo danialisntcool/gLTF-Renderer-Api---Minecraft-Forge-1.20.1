@@ -81,9 +81,7 @@ public record GltfUnbakedGeometry(ResourceLocation model, String texture, boolea
         int[] indices = primitive.indices();
         float[] positions = primitive.positions();
         float[] normals = primitive.normals();
-        float[] uvs = primitive.material().baseColorTexture() != null
-                && primitive.material().baseColorTexture().textureCoordinate() == 1
-                ? primitive.secondaryTextureCoordinates() : primitive.textureCoordinates();
+        float[] uvs = primitive.compatibleUvs();
         float[] colors = primitive.colors();
         Matrix3f normalTransform = new Matrix3f(transform).invert().transpose();
         Vector3f faceNormal = new Vector3f();

@@ -8,6 +8,8 @@ import com.mojang.blaze3d.vertex.VertexFormatElement;
 public final class GltfVertexFormats {
     private static final VertexFormatElement UV1 = new VertexFormatElement(
             1, VertexFormatElement.Type.FLOAT, VertexFormatElement.Usage.UV, 2);
+    public static final VertexFormatElement MATERIAL_UV1 = new VertexFormatElement(
+            3, VertexFormatElement.Type.FLOAT, VertexFormatElement.Usage.UV, 2);
     private static final VertexFormatElement JOINTS = new VertexFormatElement(
             2, VertexFormatElement.Type.FLOAT, VertexFormatElement.Usage.UV, 4);
     private static final VertexFormatElement WEIGHTS = new VertexFormatElement(
@@ -28,6 +30,17 @@ public final class GltfVertexFormats {
             .put("Color", DefaultVertexFormat.ELEMENT_COLOR)
             .put("Normal", DefaultVertexFormat.ELEMENT_NORMAL)
             .put("Padding", DefaultVertexFormat.ELEMENT_PADDING)
+            .build());
+
+    public static final VertexFormat BUFFERED_PBR = new VertexFormat(ImmutableMap.<String, VertexFormatElement>builder()
+            .put("Position", DefaultVertexFormat.ELEMENT_POSITION)
+            .put("Color", DefaultVertexFormat.ELEMENT_COLOR)
+            .put("UV0", DefaultVertexFormat.ELEMENT_UV0)
+            .put("UV1", DefaultVertexFormat.ELEMENT_UV1)
+            .put("UV2", DefaultVertexFormat.ELEMENT_UV2)
+            .put("Normal", DefaultVertexFormat.ELEMENT_NORMAL)
+            .put("Padding", DefaultVertexFormat.ELEMENT_PADDING)
+            .put("MaterialUV1", MATERIAL_UV1)
             .build());
 
     public static final VertexFormat SKINNED_MODEL = new VertexFormat(ImmutableMap.<String, VertexFormatElement>builder()

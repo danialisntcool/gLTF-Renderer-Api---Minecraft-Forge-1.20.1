@@ -6,6 +6,9 @@ import me.danialisntcool.gltfapi.GltfRendererApi;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.TextureManager;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL12;
+import org.lwjgl.opengl.GL30;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.SimplePreparableReloadListener;
@@ -83,6 +86,7 @@ public final class GltfModelManager extends SimplePreparableReloadListener<GltfM
                          ProfilerFiller profiler) {
         TextureManager textureManager = Minecraft.getInstance().getTextureManager();
         GltfRenderer.clearStateCaches();
+        textureManager.register(GltfEnvironmentTexture.LOCATION, new GltfEnvironmentTexture());
         for (GltfModel model : models.values()) {
             model.close();
         }
@@ -147,7 +151,12 @@ public final class GltfModelManager extends SimplePreparableReloadListener<GltfM
         }
         GltfImageData selected = primary.ktx2() ? embedded.fallback() : primary;
         NativeImage image = NativeImage.read(new ByteArrayInputStream(selected.bytes()));
-        textureManager.register(location, new DynamicTexture(image));
+        DynamicTexture texture = new DynamicTexture(image);
+        texture.bind();
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL12.GL_TEXTURE_MAX_LEVEL,
+                31 - Integer.numberOfLeadingZeros(Math.max(image.getWidth(), image.getHeight())));
+        GL30.glGenerateMipmap(GL11.GL_TEXTURE_2D);
+        textureManager.register(location, texture);
     }
 
     record ReloadData(Map<ResourceLocation, GltfModel> models, Map<ResourceLocation, String> failures) {

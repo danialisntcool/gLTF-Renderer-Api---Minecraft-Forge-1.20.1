@@ -25,6 +25,17 @@ tasks.register('generateModMetadata') {
     inputs.property('support_url', support_url)
     inputs.property('gltf_max_resource_mebibytes', gltf_max_resource_mebibytes)
     inputs.property('gltf_max_decoded_buffer_mebibytes', gltf_max_decoded_buffer_mebibytes)
+    inputs.property('gltf_pose_cache_entries', gltf_pose_cache_entries)
+    inputs.property('gltf_environment_strength', gltf_environment_strength)
+    inputs.property('gltf_staging_mebibytes', gltf_staging_mebibytes)
+    inputs.property('gltf_gpu_stream_cache_mebibytes', gltf_gpu_stream_cache_mebibytes)
+    inputs.property('gltf_gui_environment_strength', gltf_gui_environment_strength)
+    inputs.property('gltf_icon_cache_mebibytes', gltf_icon_cache_mebibytes)
+    inputs.property('gltf_icon_cache_entries', gltf_icon_cache_entries)
+    inputs.property('gltf_icon_max_resolution', gltf_icon_max_resolution)
+    inputs.property('gltf_icon_builds_per_frame', gltf_icon_builds_per_frame)
+    inputs.property('gltf_world_queue_limit', gltf_world_queue_limit)
+    inputs.property('gltf_static_attribute_cache_mebibytes', gltf_static_attribute_cache_mebibytes)
     outputs.dir(generatedModMetadata)
     doLast {
         def generatedPackage = "${mod_base_package}.generated"
@@ -39,6 +50,17 @@ public final class ModMetadata {
     public static final String SUPPORT_URL = \"${support_url}\";
     public static final int MAX_RESOURCE_BYTES = ${gltf_max_resource_mebibytes} * 1024 * 1024;
     public static final int MAX_DECODED_BUFFER_BYTES = ${gltf_max_decoded_buffer_mebibytes} * 1024 * 1024;
+    public static final int POSE_CACHE_ENTRIES = ${gltf_pose_cache_entries};
+    public static final float ENVIRONMENT_STRENGTH = ${gltf_environment_strength}F;
+    public static final int STAGING_BYTES = ${gltf_staging_mebibytes} * 1024 * 1024;
+    public static final long GPU_STREAM_CACHE_BYTES = ${gltf_gpu_stream_cache_mebibytes}L * 1024 * 1024;
+    public static final float GUI_ENVIRONMENT_STRENGTH = ${gltf_gui_environment_strength}F;
+    public static final long ICON_CACHE_BYTES = ${gltf_icon_cache_mebibytes}L * 1024 * 1024;
+    public static final int ICON_CACHE_ENTRIES = ${gltf_icon_cache_entries};
+    public static final int ICON_MAX_RESOLUTION = ${gltf_icon_max_resolution};
+    public static final int ICON_BUILDS_PER_FRAME = ${gltf_icon_builds_per_frame};
+    public static final int WORLD_QUEUE_LIMIT = ${gltf_world_queue_limit};
+    public static final long STATIC_ATTRIBUTE_CACHE_BYTES = ${gltf_static_attribute_cache_mebibytes}L * 1024 * 1024;
 
     private ModMetadata() {
     }
@@ -363,4 +385,13 @@ tasks.register('ktxDecoderSmoke', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'me.danialisntcool.gltfapi.KtxDecoderSmoke'
     args providers.gradleProperty('ktx_test_file').getOrElse('')
+}
+
+tasks.register('gltfShaderCompileSmoke', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'me.danialisntcool.gltfapi.GltfShaderCompileSmoke'
+    if (providers.gradleProperty('gltf_reference_jar').isPresent()) {
+        args providers.gradleProperty('gltf_reference_jar').get()
+    }
 }

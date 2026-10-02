@@ -12,12 +12,17 @@ import java.io.IOException;
 public final class GltfShaders {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static ShaderInstance modelShader;
+    private static ShaderInstance bufferedModelShader;
+    private static ShaderInstance iconShader;
 
     private GltfShaders() {
     }
 
     public static void register(RegisterShadersEvent event) {
         try {
+            event.registerShader(new ShaderInstance(event.getResourceProvider(),
+                    ResourceLocation.fromNamespaceAndPath(GltfRendererApi.MOD_ID, "gltf_icon"),
+                    com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_TEX), shader -> iconShader = shader);
             event.registerShader(
                     new ShaderInstance(
                             event.getResourceProvider(),
@@ -27,6 +32,12 @@ public final class GltfShaders {
                         modelShader = shader;
                         LOGGER.info("Registered the glTF model shader");
                     });
+            event.registerShader(
+                    new ShaderInstance(
+                            event.getResourceProvider(),
+                            ResourceLocation.fromNamespaceAndPath(GltfRendererApi.MOD_ID, "gltf_buffered_model"),
+                            GltfVertexFormats.BUFFERED_PBR),
+                    shader -> bufferedModelShader = shader);
         } catch (IOException exception) {
             String message = "Could not load the glTF model shader | Support: " + GltfRendererApi.SUPPORT_URL;
             LOGGER.error(message, exception);
@@ -40,5 +51,18 @@ public final class GltfShaders {
                     + GltfRendererApi.SUPPORT_URL);
         }
         return modelShader;
+    }
+
+    public static ShaderInstance bufferedModelShader() {
+        if (bufferedModelShader == null) {
+            throw new IllegalStateException("The glTF buffered material shader is not loaded | Support: "
+                    + GltfRendererApi.SUPPORT_URL);
+        }
+        return bufferedModelShader;
+    }
+
+    public static ShaderInstance iconShader() {
+        if (iconShader == null) throw new IllegalStateException("The glTF icon shader is not loaded");
+        return iconShader;
     }
 }

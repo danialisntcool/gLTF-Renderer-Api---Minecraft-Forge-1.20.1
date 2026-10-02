@@ -10,6 +10,8 @@ import org.joml.Vector3f;
 
 import java.util.List;
 import java.util.Arrays;
+import java.util.BitSet;
+import me.danialisntcool.gltfapi.api.client.GltfBounds;
 
 public final class GltfPrimitive implements AutoCloseable {
     private final float[] positions;
@@ -28,8 +30,15 @@ public final class GltfPrimitive implements AutoCloseable {
     private final int skinIndex;
     private final List<Matrix4f> instances;
     private final Vector3f center;
+    private final Vector3f minimum;
+    private final Vector3f maximum;
+    private final Vector3f[] morphMinimum;
+    private final Vector3f[] morphMaximum;
+    private final BitSet activeJoints = new BitSet(64);
     private GltfGpuBuffer vertexBuffer;
     private int[] sortedIndices;
+    private final float[] compatibleUvs;
+    private GltfTriangleSorter triangleSorter;
 
     public GltfPrimitive(float[] positions, float[] normals, float[] textureCoordinates,
                          float[] secondaryTextureCoordinates, float[] colors,
@@ -60,7 +69,33 @@ public final class GltfPrimitive implements AutoCloseable {
             minimum.min(vertex);
             maximum.max(vertex);
         }
+        if (positions.length == 0) {
+            minimum.zero();
+            maximum.zero();
+        }
+        this.minimum = new Vector3f(minimum);
+        this.maximum = new Vector3f(maximum);
         this.center = minimum.add(maximum).mul(0.5F);
+        morphMinimum = new Vector3f[morphPositions.length];
+        morphMaximum = new Vector3f[morphPositions.length];
+        for (int target = 0; target < morphPositions.length; target++) {
+            Vector3f min = new Vector3f(0);
+            Vector3f max = new Vector3f(0);
+            for (int offset = 0; offset < morphPositions[target].length; offset += 3) {
+                vertex.set(morphPositions[target][offset], morphPositions[target][offset + 1], morphPositions[target][offset + 2]);
+                min.min(vertex);
+                max.max(vertex);
+            }
+            morphMinimum[target] = min;
+            morphMaximum[target] = max;
+        }
+        for (int influence = 0; weights != null && influence < weights.length; influence++) {
+            if (weights[influence] > 0) activeJoints.set((int) joints[influence]);
+        }
+        GltfTextureInfo texture = material.baseColorTexture();
+        this.compatibleUvs = texture == null ? textureCoordinates
+                : texture.transformedCoordinates(texture.textureCoordinate() == 1
+                ? secondaryTextureCoordinates : textureCoordinates);
     }
 
     public float[] positions() {
@@ -81,6 +116,17 @@ public final class GltfPrimitive implements AutoCloseable {
 
     public float[] secondaryTextureCoordinates() {
         return secondaryTextureCoordinates;
+    }
+
+    float[] compatibleUvs() {
+        return compatibleUvs;
+    }
+
+    int[] sortedIndices(Matrix4f pose, float[] deformedPositions) {
+        if (triangleSorter == null) {
+            triangleSorter = new GltfTriangleSorter(indices);
+        }
+        return triangleSorter.sort(pose, deformedPositions);
     }
 
     public int[] indices() {
@@ -123,6 +169,21 @@ public final class GltfPrimitive implements AutoCloseable {
         return morphNormals;
     }
 
+    GltfBounds morphedBounds(float[] weights) {
+        Vector3f min = new Vector3f(minimum);
+        Vector3f max = new Vector3f(maximum);
+        for (int target = 0; target < Math.min(weights.length, morphMinimum.length); target++) {
+            float weight = weights[target];
+            min.fma(weight, weight >= 0 ? morphMinimum[target] : morphMaximum[target]);
+            max.fma(weight, weight >= 0 ? morphMaximum[target] : morphMinimum[target]);
+        }
+        return new GltfBounds(min, max);
+    }
+
+    BitSet activeJoints() {
+        return activeJoints;
+    }
+
     List<Matrix4f> instances() {
         return instances;
     }
@@ -154,10 +215,10 @@ public final class GltfPrimitive implements AutoCloseable {
             builder.putFloat(4, secondaryTextureCoordinates[textureOffset + 1]);
             builder.nextElement();
             builder.color(
-                            colors[colorOffset] * material.red(),
-                            colors[colorOffset + 1] * material.green(),
-                            colors[colorOffset + 2] * material.blue(),
-                            colors[colorOffset + 3] * material.alpha())
+                            colors[colorOffset],
+                            colors[colorOffset + 1],
+                            colors[colorOffset + 2],
+                            colors[colorOffset + 3])
                     .normal(normals[positionOffset], normals[positionOffset + 1], normals[positionOffset + 2]);
             if (skinIndex >= 0 || morphPositions.length > 0) {
                 int jointOffset = index * 4;
@@ -208,7 +269,10 @@ public final class GltfPrimitive implements AutoCloseable {
     GltfGpuBuffer sortedVertexBuffer(int[] orderedIndices) {
         if (!Arrays.equals(sortedIndices, orderedIndices)) {
             vertexBuffer.updateIndices(orderedIndices);
-            sortedIndices = orderedIndices.clone();
+            if (sortedIndices == null || sortedIndices.length != orderedIndices.length) {
+                sortedIndices = new int[orderedIndices.length];
+            }
+            System.arraycopy(orderedIndices, 0, sortedIndices, 0, orderedIndices.length);
         }
         return vertexBuffer;
     }
@@ -220,5 +284,6 @@ public final class GltfPrimitive implements AutoCloseable {
             vertexBuffer = null;
         }
         sortedIndices = null;
+        triangleSorter = null;
     }
 }

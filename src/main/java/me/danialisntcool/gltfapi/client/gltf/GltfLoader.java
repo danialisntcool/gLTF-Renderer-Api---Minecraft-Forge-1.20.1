@@ -320,7 +320,13 @@ public final class GltfLoader {
 
     private void normalizeWeights(float[] weights) {
         for (int offset = 0; offset < weights.length; offset += 4) {
+            for (int influence = 0; influence < 4; influence++) {
+                if (!Float.isFinite(weights[offset + influence]) || weights[offset + influence] < 0) {
+                    throw error("Skin weights must be finite and nonnegative");
+                }
+            }
             float sum = weights[offset] + weights[offset + 1] + weights[offset + 2] + weights[offset + 3];
+            if (!Float.isFinite(sum)) throw error("Skin weight sum is not finite");
             if (sum <= 0.0F) {
                 weights[offset] = 1.0F;
                 weights[offset + 1] = 0.0F;
@@ -695,7 +701,7 @@ public final class GltfLoader {
             JsonObject sampler = element.getAsJsonObject();
             samplers.add(new GltfSampler(
                     integer(sampler, "magFilter", 9729),
-                    integer(sampler, "minFilter", 9729),
+                    integer(sampler, "minFilter", 9987),
                     integer(sampler, "wrapS", 10497),
                     integer(sampler, "wrapT", 10497)));
         }

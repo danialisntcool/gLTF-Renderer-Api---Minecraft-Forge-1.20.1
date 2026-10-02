@@ -25,7 +25,7 @@ public abstract class GltfEntityRenderer<T extends Entity> extends EntityRendere
     @Override
     public final void render(T entity, float yaw, float partialTick, PoseStack poseStack,
                              MultiBufferSource buffers, int packedLight) {
-        GltfApi.render(model, new GltfRenderContext(
+        GltfApi.renderWorld(model, new GltfRenderContext(
                 poseStack,
                 buffers,
                 packedLight,
@@ -36,6 +36,25 @@ public abstract class GltfEntityRenderer<T extends Entity> extends EntityRendere
 
     protected GltfRenderOptions renderOptions(T entity, float yaw, float partialTick) {
         return GltfRenderOptions.DEFAULT;
+    }
+
+    @Override
+    public boolean shouldRender(T entity, net.minecraft.client.renderer.culling.Frustum frustum,
+                                double cameraX, double cameraY, double cameraZ) {
+        if (!entity.shouldRender(cameraX, cameraY, cameraZ)) return false;
+        if (entity.noCulling || me.danialisntcool.gltfapi.client.gltf.GltfRenderer.isRenderingShadowPass()) return true;
+        float partial = net.minecraft.client.Minecraft.getInstance().getFrameTime();
+        float yaw = net.minecraft.util.Mth.rotLerp(partial, entity.yRotO, entity.getYRot());
+        GltfRenderOptions options = renderOptions(entity, yaw, partial);
+        var offset = getRenderOffset(entity, partial);
+        org.joml.Matrix4f world = new org.joml.Matrix4f().translation(
+                (float) (net.minecraft.util.Mth.lerp(partial, entity.xOld, entity.getX()) + offset.x),
+                (float) (net.minecraft.util.Mth.lerp(partial, entity.yOld, entity.getY()) + offset.y),
+                (float) (net.minecraft.util.Mth.lerp(partial, entity.zOld, entity.getZ()) + offset.z));
+        boolean visible = GltfApi.bounds(model, options).map(bounds -> frustum.isVisible(
+                bounds.transformed(world.mul(options.transformationMatrix())).inflate(0.01))).orElse(true);
+        if (!visible) me.danialisntcool.gltfapi.client.gltf.GltfRenderMetrics.culled();
+        return visible;
     }
 
     @Override

@@ -5,6 +5,7 @@ import me.danialisntcool.gltfapi.api.client.GltfApi;
 import me.danialisntcool.gltfapi.api.client.GltfModelHandle;
 import me.danialisntcool.gltfapi.api.client.GltfRenderContext;
 import me.danialisntcool.gltfapi.api.client.GltfRenderOptions;
+import me.danialisntcool.gltfapi.client.gltf.GltfGuiIconCache;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -25,12 +26,14 @@ public class GltfItemRenderer extends BlockEntityWithoutLevelRenderer {
     @Override
     public final void renderByItem(ItemStack stack, ItemDisplayContext displayContext, PoseStack poseStack,
                                    MultiBufferSource buffers, int packedLight, int packedOverlay) {
-        GltfApi.renderBuffered(model, new GltfRenderContext(
+        GltfRenderContext context = new GltfRenderContext(
                 poseStack,
                 buffers,
                 packedLight,
                 packedOverlay,
-                renderOptions(stack, displayContext)));
+                renderOptions(stack, displayContext));
+        if (displayContext == ItemDisplayContext.GUI && GltfGuiIconCache.render(model, context)) return;
+        GltfApi.renderBuffered(model, context);
     }
 
     protected GltfRenderOptions renderOptions(ItemStack stack, ItemDisplayContext displayContext) {

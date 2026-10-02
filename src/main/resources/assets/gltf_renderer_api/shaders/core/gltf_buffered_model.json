@@ -1,0 +1,425 @@
+{
+  "vertex": "gltf_renderer_api:gltf_buffered_model",
+  "fragment": "gltf_renderer_api:gltf_model",
+  "attributes": [
+    "Position",
+    "Color",
+    "UV0",
+    "UV1",
+    "UV2",
+    "Normal",
+    "MaterialUV1"
+  ],
+  "samplers": [
+    {
+      "name": "Sampler0"
+    },
+    {
+      "name": "Sampler1"
+    },
+    {
+      "name": "Sampler2"
+    },
+    {
+      "name": "Sampler3"
+    },
+    {
+      "name": "Sampler4"
+    },
+    {
+      "name": "Sampler5"
+    },
+    {
+      "name": "Sampler6"
+    },
+    {
+      "name": "Sampler7"
+    }
+  ],
+  "uniforms": [
+    { "name": "GuiMode", "type": "int", "count": 1, "values": [0] },
+    {
+      "name": "ModelViewMat",
+      "type": "matrix4x4",
+      "count": 16,
+      "values": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "name": "ProjMat",
+      "type": "matrix4x4",
+      "count": 16,
+      "values": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "name": "IViewRotMat",
+      "type": "matrix3x3",
+      "count": 9,
+      "values": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "name": "ColorModulator",
+      "type": "float",
+      "count": 4,
+      "values": [
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Light0_Direction",
+      "type": "float",
+      "count": 3,
+      "values": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Light1_Direction",
+      "type": "float",
+      "count": 3,
+      "values": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "AlphaCutoff",
+      "type": "float",
+      "count": 1,
+      "values": [
+        0
+      ]
+    },
+    {
+      "name": "FogStart",
+      "type": "float",
+      "count": 1,
+      "values": [
+        0
+      ]
+    },
+    {
+      "name": "FogEnd",
+      "type": "float",
+      "count": 1,
+      "values": [
+        1
+      ]
+    },
+    {
+      "name": "FogColor",
+      "type": "float",
+      "count": 4,
+      "values": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "FogShape",
+      "type": "int",
+      "count": 1,
+      "values": [
+        0
+      ]
+    },
+    {
+      "name": "HasBaseColorTexture",
+      "type": "int",
+      "count": 1,
+      "values": [
+        0
+      ]
+    },
+    {
+      "name": "HasMetallicRoughnessTexture",
+      "type": "int",
+      "count": 1,
+      "values": [
+        0
+      ]
+    },
+    {
+      "name": "HasNormalTexture",
+      "type": "int",
+      "count": 1,
+      "values": [
+        0
+      ]
+    },
+    {
+      "name": "HasOcclusionTexture",
+      "type": "int",
+      "count": 1,
+      "values": [
+        0
+      ]
+    },
+    {
+      "name": "HasEmissiveTexture",
+      "type": "int",
+      "count": 1,
+      "values": [
+        0
+      ]
+    },
+    {
+      "name": "BaseColorDecodedSrgb",
+      "type": "int",
+      "count": 1,
+      "values": [
+        0
+      ]
+    },
+    {
+      "name": "EmissiveDecodedSrgb",
+      "type": "int",
+      "count": 1,
+      "values": [
+        0
+      ]
+    },
+    {
+      "name": "IsUnlit",
+      "type": "int",
+      "count": 1,
+      "values": [
+        0
+      ]
+    },
+    {
+      "name": "MetallicFactor",
+      "type": "float",
+      "count": 1,
+      "values": [
+        1
+      ]
+    },
+    {
+      "name": "BaseColorFactor",
+      "type": "float",
+      "count": 4,
+      "values": [
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "AlphaMode",
+      "type": "int",
+      "count": 1,
+      "values": [
+        0
+      ]
+    },
+    {
+      "name": "EnvironmentStrength",
+      "type": "float",
+      "count": 1,
+      "values": [
+        0.35
+      ]
+    },
+    {
+      "name": "RoughnessFactor",
+      "type": "float",
+      "count": 1,
+      "values": [
+        1
+      ]
+    },
+    {
+      "name": "NormalScale",
+      "type": "float",
+      "count": 1,
+      "values": [
+        1
+      ]
+    },
+    {
+      "name": "OcclusionStrength",
+      "type": "float",
+      "count": 1,
+      "values": [
+        1
+      ]
+    },
+    {
+      "name": "EmissiveFactor",
+      "type": "float",
+      "count": 3,
+      "values": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "TextureCoordinateSets",
+      "type": "int",
+      "count": 4,
+      "values": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "EmissiveTextureCoordinateSet",
+      "type": "int",
+      "count": 1,
+      "values": [
+        0
+      ]
+    },
+    {
+      "name": "BaseColorUvTransform",
+      "type": "float",
+      "count": 4,
+      "values": [
+        0,
+        0,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "MetallicRoughnessUvTransform",
+      "type": "float",
+      "count": 4,
+      "values": [
+        0,
+        0,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "NormalUvTransform",
+      "type": "float",
+      "count": 4,
+      "values": [
+        0,
+        0,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "OcclusionUvTransform",
+      "type": "float",
+      "count": 4,
+      "values": [
+        0,
+        0,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "EmissiveUvTransform",
+      "type": "float",
+      "count": 4,
+      "values": [
+        0,
+        0,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "BaseColorUvRotation",
+      "type": "float",
+      "count": 1,
+      "values": [
+        0
+      ]
+    },
+    {
+      "name": "MetallicRoughnessUvRotation",
+      "type": "float",
+      "count": 1,
+      "values": [
+        0
+      ]
+    },
+    {
+      "name": "NormalUvRotation",
+      "type": "float",
+      "count": 1,
+      "values": [
+        0
+      ]
+    },
+    {
+      "name": "OcclusionUvRotation",
+      "type": "float",
+      "count": 1,
+      "values": [
+        0
+      ]
+    },
+    {
+      "name": "EmissiveUvRotation",
+      "type": "float",
+      "count": 1,
+      "values": [
+        0
+      ]
+    }
+  ]
+}

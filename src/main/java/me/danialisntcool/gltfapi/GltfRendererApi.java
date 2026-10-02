@@ -34,10 +34,10 @@ public final class GltfRendererApi {
 
     private void buildCreativeTab(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.SPAWN_EGGS) {
-            event.accept(TestContent.TEST_CHARACTER_SPAWN_EGG.get());
+            TestContent.TEST_CHARACTER_SPAWN_EGG.ifPresent(event::accept);
         }
         if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS) {
-            event.accept(TestContent.TEST_STATIC_BLOCK_ITEM.get());
+            TestContent.TEST_STATIC_BLOCK_ITEM.ifPresent(event::accept);
         }
     }
 }

@@ -28,6 +28,8 @@ uniform int HasSkin;
 uniform mat4 JointMatrices[64];
 uniform int HasMorphTargets;
 uniform vec4 MorphWeights;
+uniform int HasInstances;
+uniform samplerBuffer Sampler8;
 
 out float vertexDistance;
 out vec4 vertexColor;
@@ -38,6 +40,10 @@ out vec3 viewPosition;
 out vec3 viewNormal;
 
 uniform sampler2D Sampler2;
+uniform sampler2D Sampler6;
+uniform ivec2 OverlayUV;
+
+out vec4 overlayColor;
 
 void main() {
     vec3 morphedPosition = Position;
@@ -57,13 +63,29 @@ void main() {
     }
     vec4 skinnedPosition = skinMatrix * vec4(morphedPosition, 1.0);
     vec3 skinnedNormal = mat3(skinMatrix) * morphedNormal;
-    vec4 position = ModelViewMat * skinnedPosition;
+    mat4 drawMatrix = ModelViewMat;
+    mat3 normalMatrix = NormalMat;
+    ivec2 lightUv = LightUV;
+    ivec2 overlayUv = OverlayUV;
+    if (HasInstances == 1) {
+        int first = gl_InstanceID * 8;
+        mat4 instanceMatrix = mat4(texelFetch(Sampler8, first), texelFetch(Sampler8, first + 1),
+                texelFetch(Sampler8, first + 2), texelFetch(Sampler8, first + 3));
+        normalMatrix = mat3(ModelViewMat) * mat3(texelFetch(Sampler8, first + 4).xyz,
+                texelFetch(Sampler8, first + 5).xyz, texelFetch(Sampler8, first + 6).xyz);
+        drawMatrix = ModelViewMat * instanceMatrix;
+        ivec4 instanceLighting = ivec4(texelFetch(Sampler8, first + 7));
+        lightUv = instanceLighting.xy;
+        overlayUv = instanceLighting.zw;
+    }
+    vec4 position = drawMatrix * skinnedPosition;
     gl_Position = ProjMat * position;
-    vertexDistance = fog_distance(ModelViewMat, IViewRotMat * Position, FogShape);
+    vertexDistance = fog_distance(mat4(1.0), IViewRotMat * position.xyz, FogShape);
     vertexColor = Color;
-    lightMapColor = texelFetch(Sampler2, LightUV / 16, 0);
+    lightMapColor = texelFetch(Sampler2, clamp(lightUv / 16, ivec2(0), ivec2(15)), 0);
+    overlayColor = texelFetch(Sampler6, clamp(overlayUv, ivec2(0), ivec2(15)), 0);
     primaryTextureCoordinates = UV0;
     secondaryTextureCoordinates = UV1;
     viewPosition = position.xyz;
-    viewNormal = normalize(NormalMat * skinnedNormal);
+    viewNormal = normalize(normalMatrix * skinnedNormal);
 }

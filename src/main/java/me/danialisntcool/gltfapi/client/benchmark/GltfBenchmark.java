@@ -9,6 +9,9 @@ import me.danialisntcool.gltfapi.api.client.GltfModelStatistics;
 import me.danialisntcool.gltfapi.api.client.GltfRenderContext;
 import me.danialisntcool.gltfapi.api.client.GltfRenderOptions;
 import me.danialisntcool.gltfapi.api.client.GltfRenderRequest;
+import me.danialisntcool.gltfapi.api.client.GltfRenderMode;
+import me.danialisntcool.gltfapi.client.gltf.GltfRenderMetrics;
+import me.danialisntcool.gltfapi.client.gltf.GltfRenderer;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LightTexture;
@@ -36,6 +39,18 @@ public final class GltfBenchmark {
 
     @SubscribeEvent
     public void registerCommands(RegisterClientCommandsEvent event) {
+        var duration = Commands.argument("seconds", IntegerArgumentType.integer(1, 300))
+                .executes(context -> start(ResourceLocationArgument.getId(context, "model"),
+                        IntegerArgumentType.getInteger(context, "instances"),
+                        IntegerArgumentType.getInteger(context, "seconds")))
+                .then(Commands.literal("native").executes(context -> start(
+                        ResourceLocationArgument.getId(context, "model"),
+                        IntegerArgumentType.getInteger(context, "instances"),
+                        IntegerArgumentType.getInteger(context, "seconds"), GltfRenderMode.NATIVE)))
+                .then(Commands.literal("buffered").executes(context -> start(
+                        ResourceLocationArgument.getId(context, "model"),
+                        IntegerArgumentType.getInteger(context, "instances"),
+                        IntegerArgumentType.getInteger(context, "seconds"), GltfRenderMode.BUFFERED)));
         event.getDispatcher().register(Commands.literal("gltfbenchmark")
                 .requires(source -> source.hasPermission(2))
                 .then(Commands.literal("start")
@@ -44,10 +59,7 @@ public final class GltfBenchmark {
                                 .then(Commands.argument("instances", IntegerArgumentType.integer(1, 4096))
                                         .executes(context -> start(ResourceLocationArgument.getId(context, "model"),
                                                 IntegerArgumentType.getInteger(context, "instances"), 10))
-                                        .then(Commands.argument("seconds", IntegerArgumentType.integer(1, 300))
-                                                .executes(context -> start(ResourceLocationArgument.getId(context, "model"),
-                                                        IntegerArgumentType.getInteger(context, "instances"),
-                                                        IntegerArgumentType.getInteger(context, "seconds")))))))
+                                        .then(duration))))
                 .then(Commands.literal("stop").executes(context -> stop()))
                 .then(Commands.literal("status").executes(context -> status())));
     }
@@ -68,9 +80,11 @@ public final class GltfBenchmark {
             active.addFrame(frameStart - active.lastFrameNanos);
         }
         active.lastFrameNanos = frameStart;
+        GltfRenderMetrics.Snapshot before = GltfRenderMetrics.snapshot();
         renderGrid(active, event);
         if (elapsed >= WARMUP_NANOS) {
             active.renderNanos += System.nanoTime() - frameStart;
+            active.addMetrics(GltfRenderMetrics.snapshot().minus(before));
         }
         if (elapsed >= WARMUP_NANOS + active.durationNanos) {
             finish(active);
@@ -78,6 +92,10 @@ public final class GltfBenchmark {
     }
 
     private int start(ResourceLocation location, int instances, int seconds) {
+        return start(location, instances, seconds, GltfRenderMode.AUTO);
+    }
+
+    private int start(ResourceLocation location, int instances, int seconds, GltfRenderMode mode) {
         GltfModelHandle model = GltfApi.model(location);
         if (!GltfApi.isLoaded(model)) {
             message("Model is not loaded: " + location);
@@ -90,8 +108,9 @@ public final class GltfBenchmark {
         float largest = Math.max(width, Math.max(height, depth));
         float scale = largest > 0.0F ? 1.25F / largest : 1.0F;
         session = new Session(model, location, instances, seconds * 1_000_000_000L, scale,
-                statistics.triangles(), new double[Math.max(1024, seconds * 240)]);
-        message("glTF benchmark warming up for 3 seconds: " + instances + " instances of " + location);
+                statistics.triangles(), new double[Math.max(1024, seconds * 240)], mode);
+        message("glTF benchmark warming up for 3 seconds: " + instances + " instances of " + location
+                + " | requested " + mode + " | shaders " + GltfRenderer.isShaderPackInUse());
         return 1;
     }
 
@@ -132,10 +151,9 @@ public final class GltfBenchmark {
         int rows = (active.instances + columns - 1) / columns;
         float spacing = 1.65F;
         float distance = Math.max(8.0F, Math.max(columns, rows) * 1.15F);
-        GltfRenderOptions options = GltfRenderOptions.DEFAULT.withTransform(
-                new Vector3f(), new org.joml.Quaternionf(), new Vector3f(active.scale));
         PoseStack poseStack = event.getPoseStack();
-        List<GltfRenderRequest> requests = new ArrayList<>(active.instances);
+        List<GltfRenderRequest> requests = active.requests;
+        requests.clear();
         for (int index = 0; index < active.instances; index++) {
             int column = index % columns;
             int row = index / columns;
@@ -147,7 +165,7 @@ public final class GltfBenchmark {
             poseStack.pushPose();
             poseStack.translate(worldX - cameraPosition.x, worldY - cameraPosition.y, worldZ - cameraPosition.z);
             requests.add(new GltfRenderRequest(active.model, new GltfRenderContext(poseStack, buffers,
-                    LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, options)));
+                    LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, active.options).withRenderMode(active.mode)));
             poseStack.popPose();
         }
         GltfApi.renderBatch(requests);
@@ -180,6 +198,13 @@ public final class GltfBenchmark {
                 "glTF benchmark complete | %s | %d instances | %,d triangles/frame | %.1f FPS | avg %.2f ms | median %.2f ms | p95 %.2f ms | p99 %.2f ms | glTF submit %.2f ms/frame",
                 active.location, active.instances, (long) active.instances * active.triangles,
                 fps, average, median, p95, p99, renderMilliseconds));
+        double frames = Math.max(1, active.totalRenderedFrames);
+        message(String.format(java.util.Locale.ROOT,
+                "glTF benchmark counters | requested %s | shaders %s | indexed draws %.1f/frame | instanced draws %.1f/frame | indexed/instance uploads %.3f MiB/frame | CPU transformed %,d vertices/frame | bulk/indexed vertices %,d/frame | pose cache hits %.1f/frame | GPU buffer reuses %.1f/frame",
+                active.mode, GltfRenderer.isShaderPackInUse(), active.draws / frames,
+                active.instancedDraws / frames, active.uploadedBytes / frames / 1_048_576.0,
+                Math.round(active.transformedVertices / frames), Math.round(active.streamedVertices / frames),
+                active.poseCacheHits / frames, active.bufferReuses / frames));
     }
 
     private double percentile(double[] sorted, double percentile) {
@@ -202,15 +227,25 @@ public final class GltfBenchmark {
         private final long durationNanos;
         private final float scale;
         private final int triangles;
+        private final GltfRenderMode mode;
+        private final GltfRenderOptions options;
+        private final List<GltfRenderRequest> requests;
         private double[] frameMilliseconds;
         private int sampleCount;
         private int totalRenderedFrames;
         private long firstFrameNanos;
         private long lastFrameNanos;
         private long renderNanos;
+        private long draws;
+        private long instancedDraws;
+        private long uploadedBytes;
+        private long transformedVertices;
+        private long streamedVertices;
+        private long poseCacheHits;
+        private long bufferReuses;
 
         private Session(GltfModelHandle model, ResourceLocation location, int instances,
-                        long durationNanos, float scale, int triangles, double[] frameMilliseconds) {
+                        long durationNanos, float scale, int triangles, double[] frameMilliseconds, GltfRenderMode mode) {
             this.model = model;
             this.location = location;
             this.instances = instances;
@@ -218,6 +253,20 @@ public final class GltfBenchmark {
             this.scale = scale;
             this.triangles = triangles;
             this.frameMilliseconds = frameMilliseconds;
+            this.mode = mode;
+            this.options = GltfRenderOptions.DEFAULT.withTransform(
+                    new Vector3f(), new org.joml.Quaternionf(), new Vector3f(scale));
+            this.requests = new ArrayList<>(instances);
+        }
+
+        private void addMetrics(GltfRenderMetrics.Snapshot metrics) {
+            draws += metrics.draws();
+            instancedDraws += metrics.instancedDraws();
+            uploadedBytes += metrics.uploadedBytes();
+            transformedVertices += metrics.transformedVertices();
+            streamedVertices += metrics.streamedVertices();
+            poseCacheHits += metrics.poseCacheHits();
+            bufferReuses += metrics.bufferReuses();
         }
 
         private void addFrame(long frameNanos) {

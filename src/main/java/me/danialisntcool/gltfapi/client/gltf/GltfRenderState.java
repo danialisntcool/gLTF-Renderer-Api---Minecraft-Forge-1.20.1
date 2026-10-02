@@ -5,6 +5,7 @@ import org.joml.Matrix4f;
 import java.util.BitSet;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import me.danialisntcool.gltfapi.api.client.GltfBounds;
 
 final class GltfRenderState {
     private final Matrix4f[] transforms;
@@ -12,6 +13,7 @@ final class GltfRenderState {
     private final float[][] morphWeights;
     private final Map<GltfPrimitive, float[]> skinMatrices = new IdentityHashMap<>();
     private final Map<GltfPrimitive, GltfDeformedGeometry> deformedGeometry = new IdentityHashMap<>();
+    GltfBounds bounds;
 
     GltfRenderState(Matrix4f[] transforms, BitSet visibleNodes, float[][] morphWeights) {
         this.transforms = transforms;

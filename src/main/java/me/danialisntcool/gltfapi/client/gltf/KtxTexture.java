@@ -19,6 +19,8 @@ import java.nio.IntBuffer;
 final class KtxTexture extends AbstractTexture {
     private final byte[] encoded;
     private boolean loaded;
+    private boolean srgb;
+    private boolean mipmaps;
 
     KtxTexture(byte[] encoded) {
         this.encoded = encoded.clone();
@@ -37,6 +39,8 @@ final class KtxTexture extends AbstractTexture {
             check(KTX.ktxTexture2_CreateFromMemory(data, KTX.KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, output), "create");
             ktxTexture2 texture = ktxTexture2.create(output.get(0));
             try {
+                srgb = KTX.ktxTexture2_GetOETF(texture) == 2;
+                mipmaps = texture.numLevels() > 1;
                 if (KTX.ktxTexture2_NeedsTranscoding(texture)) {
                     check(KTX.ktxTexture2_TranscodeBasis(texture, selectFormat(), 0), "transcode");
                 }
@@ -55,6 +59,14 @@ final class KtxTexture extends AbstractTexture {
         } finally {
             MemoryUtil.memFree(data);
         }
+    }
+
+    boolean decodesSrgb() {
+        return srgb;
+    }
+
+    boolean hasMipmaps() {
+        return mipmaps;
     }
 
     private int selectFormat() {
