@@ -5,6 +5,7 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -97,5 +98,37 @@ final class GltfStreamWriterTest {
         assertEquals(0.2F, reused.getFloat(16));
         assertEquals(0.7F, reused.getFloat(36));
         assertEquals(255, reused.get(12) & 255);
+    }
+
+    @Test
+    void growingConsumedStagingBufferStartsAtAllocationBeginning() throws Exception {
+        var ensure = GltfStreamWriter.class.getDeclaredMethod("ensure", ByteBuffer.class, int.class);
+        ensure.setAccessible(true);
+        ByteBuffer buffer = MemoryUtil.memAlloc(4096);
+        try {
+            buffer.position(3960).limit(3960);
+            buffer = (ByteBuffer) ensure.invoke(null, buffer, 300000);
+            assertEquals(0, buffer.position());
+            assertEquals(buffer.capacity(), buffer.limit());
+            assertTrue(buffer.remaining() >= 300000);
+            assertEquals(MemoryUtil.memAddress0(buffer), MemoryUtil.memAddress(buffer));
+        } finally {
+            MemoryUtil.memFree(buffer);
+        }
+    }
+
+    @Test
+    void reusingConsumedStagingBufferRestoresEntireAllocation() throws Exception {
+        var ensure = GltfStreamWriter.class.getDeclaredMethod("ensure", ByteBuffer.class, int.class);
+        ensure.setAccessible(true);
+        ByteBuffer buffer = MemoryUtil.memAlloc(4096);
+        try {
+            buffer.position(3960).limit(3960);
+            buffer = (ByteBuffer) ensure.invoke(null, buffer, 2048);
+            assertEquals(0, buffer.position());
+            assertEquals(4096, buffer.remaining());
+        } finally {
+            MemoryUtil.memFree(buffer);
+        }
     }
 }

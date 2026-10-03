@@ -147,7 +147,7 @@ final class GltfStreamWriter {
         int capacity = Math.min(ModMetadata.STAGING_BYTES, Math.max(bytes, Math.max(4096,
                 buffer == null ? 0 : buffer.capacity() * 2)));
         return (buffer == null ? MemoryUtil.memAlloc(capacity) : MemoryUtil.memRealloc(buffer, capacity))
-                .order(ByteOrder.nativeOrder());
+                .clear().order(ByteOrder.nativeOrder());
     }
 
     static void clear() {
