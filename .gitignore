@@ -25,3 +25,12 @@ mcmodsrepo
 # Files from Forge MDK
 forge*changelog.txt
 logs/
+
+/docs/PERFORMANCE_REVIEW.md
+/docs/RENDERING_INTEGRATION.md
+/.private-docs/
+/docs/private/
+/.codex/
+/.agents/
+/AGENTS.md
+/CLAUDE.md
