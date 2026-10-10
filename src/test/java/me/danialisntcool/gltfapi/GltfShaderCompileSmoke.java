@@ -25,6 +25,9 @@ public final class GltfShaderCompileSmoke {
             GLFW.glfwMakeContextCurrent(window);
             GL.createCapabilities();
             RenderSystem.initRenderThread();
+            var config = com.electronwill.nightconfig.core.CommentedConfig.inMemory();
+            me.danialisntcool.gltfapi.client.GltfClientConfig.SPEC.correct(config);
+            me.danialisntcool.gltfapi.client.GltfClientConfig.SPEC.setConfig(config);
             String fog = resource("/assets/minecraft/shaders/include/fog.glsl")
                     .replaceAll("(?m)^#version[^\\r\\n]*", "");
             if (arguments.length > 0) {
@@ -53,6 +56,7 @@ public final class GltfShaderCompileSmoke {
                 GltfInstancingSmoke.verify(resource("/assets/gltf_renderer_api/shaders/core/gltf_model.vsh")
                         .replace("#moj_import <fog.glsl>", fog));
                 GltfBufferPoolSmoke.verify();
+                me.danialisntcool.gltfapi.client.gltf.GltfPersistentStreamSmoke.verify();
                 int iconFragment = compile(GL20.GL_FRAGMENT_SHADER, "gltf_icon.fsh", fog);
                 try {
                     link("gltf_icon.vsh", iconFragment, fog);
@@ -63,6 +67,7 @@ public final class GltfShaderCompileSmoke {
                 GltfIconShaderSmoke.verify(resource("/assets/gltf_renderer_api/shaders/core/gltf_icon.vsh"),
                         resource("/assets/gltf_renderer_api/shaders/core/gltf_icon.fsh"));
                 me.danialisntcool.gltfapi.client.gltf.GltfIconStateSmoke.verify();
+                me.danialisntcool.gltfapi.client.gltf.GltfIconQueueSmoke.verify();
                 System.out.println("glTF native and buffered GLSL 150 shaders compiled and linked successfully");
             } finally {
                 GL20.glDeleteShader(fragment);

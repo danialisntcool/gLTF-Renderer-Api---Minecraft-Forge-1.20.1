@@ -186,7 +186,8 @@ public final class GltfRenderer {
     }
 
     public static boolean usesBufferedPbr(GltfRenderMode requested) {
-        if (GltfShaderPackCompat.isShaderPackInUse() || GltfShaderPackCompat.isRenderingShadowPass()) {
+        if (GltfShaderPackCompat.isRenderingShadowPass()
+                || GltfShaderPackCompat.isShaderPackInUse() && !isOrthographic(RenderSystem.getProjectionMatrix())) {
             return false;
         }
         GltfRenderMode mode = requested == GltfRenderMode.AUTO ? GltfClientConfig.RENDER_MODE.get() : requested;
@@ -335,6 +336,24 @@ public final class GltfRenderer {
         }
         GltfMaterial material = primitive.material();
         RenderType renderType = pbr ? GltfBufferedPbrTypes.get(material) : compatibleRenderType(material, shadowPass);
+        if (!pbr && (shadowPass || GltfShaderPackCompat.isShaderPackInUse())
+                && GltfClientConfig.SHADER_GEOMETRY_CACHE.get() && material.alphaMode() != GltfMaterial.AlphaMode.BLEND
+                && GltfShaderGeometryCache.canCache(primitive)
+                && buffers.getClass() == MultiBufferSource.BufferSource.class
+                && buffers instanceof MultiBufferSource.BufferSource source) {
+            source.endBatch();
+            try (GltfNativeState ignored = new GltfNativeState()) {
+                renderType.setupRenderState();
+                try {
+                    GltfShaderGeometryCache.draw(primitive, deformedGeometry(model, state, primitive),
+                            new Matrix4f(poseStack.last().pose()).mul(transform), packedLight, packedOverlay,
+                            RenderSystem.getShader());
+                } finally {
+                    renderType.clearRenderState();
+                }
+            }
+            return;
+        }
         VertexConsumer consumer = buffers.getBuffer(renderType);
         if (pbr && !(consumer instanceof com.mojang.blaze3d.vertex.BufferVertexConsumer)) {
             pbr = false;
@@ -348,12 +367,19 @@ public final class GltfRenderer {
             GltfDeformedGeometry geometry = deformedGeometry(model, state, primitive);
             int[] orderedIndices = material.alphaMode() == GltfMaterial.AlphaMode.BLEND
                     ? primitive.sortedIndices(pose, geometry.positions()) : primitive.indices();
+            if (!pbr && (shadowPass || GltfShaderPackCompat.isShaderPackInUse())
+                    && GltfClientConfig.SHADER_GEOMETRY_CACHE.get()
+                    && consumer instanceof com.mojang.blaze3d.vertex.BufferBuilder shaderBuilder
+                    && GltfShaderStreamWriter.append(shaderBuilder, primitive, geometry, pose, normalMatrix,
+                    packedLight, packedOverlay, GltfShaderPackCompat.captureEntityState())) return;
             if (!shadowPass && !GltfShaderPackCompat.isShaderPackInUse()
                     && consumer instanceof com.mojang.blaze3d.vertex.BufferBuilder builder
                     && GltfStreamWriter.append(builder, primitive, geometry, pose, normalMatrix,
                     orderedIndices, packedLight, packedOverlay, pbr)) {
+                GltfRenderMetrics.buffered(true, (long) orderedIndices.length * (pbr ? 44 : 36));
                 return;
             }
+            GltfRenderMetrics.buffered(false, 0);
             GltfRenderMetrics.stream(orderedIndices.length, orderedIndices.length);
             float[] uvs = pbr ? primitive.textureCoordinates() : primitive.compatibleUvs();
             float[] secondaryUvs = primitive.secondaryTextureCoordinates();
@@ -479,6 +505,8 @@ public final class GltfRenderer {
     static RenderType compatibleRenderType(GltfMaterial material, boolean shadowPass) {
         ResourceLocation texture = material.baseColorTexture() == null
                 ? WHITE_TEXTURE : material.baseColorTexture().texture();
+        if (GltfShaderPackCompat.isShaderPackInUse() || shadowPass)
+            texture = GltfShaderMaterialTextures.texture(material, texture);
         if (material.alphaMode() == GltfMaterial.AlphaMode.BLEND && !shadowPass) {
             return GltfRenderTypes.translucent(texture, material.doubleSided());
         }
@@ -558,9 +586,12 @@ public final class GltfRenderer {
         APPLIED_SAMPLERS.clear();
         GltfBufferedPbrTypes.clear();
         GltfStreamWriter.clear();
+        GltfShaderStreamWriter.clear();
         GltfGpuBufferPool.clear();
         GltfInstanceBuffer.clear();
         GltfCompatibleBatch.clearCaches();
+        GltfShaderGeometryCache.clear();
+        GltfShaderMaterialTextures.clear();
     }
 
     private static int textureCoordinate(GltfTextureInfo texture) {

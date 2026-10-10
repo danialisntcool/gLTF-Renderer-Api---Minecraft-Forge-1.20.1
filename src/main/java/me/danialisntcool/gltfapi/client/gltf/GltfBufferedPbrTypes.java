@@ -72,7 +72,10 @@ final class GltfBufferedPbrTypes {
                 if (material.doubleSided()) RenderSystem.disableCull(); else RenderSystem.enableCull();
                 if (material.alphaMode() == GltfMaterial.AlphaMode.BLEND) {
                     RenderSystem.enableBlend();
-                    RenderSystem.defaultBlendFunc();
+                    if (GltfRenderer.isOrthographic(RenderSystem.getProjectionMatrix()))
+                        RenderSystem.blendFuncSeparate(org.lwjgl.opengl.GL11.GL_SRC_ALPHA, org.lwjgl.opengl.GL11.GL_ONE_MINUS_SRC_ALPHA,
+                                org.lwjgl.opengl.GL11.GL_ONE, org.lwjgl.opengl.GL11.GL_ONE_MINUS_SRC_ALPHA);
+                    else RenderSystem.defaultBlendFunc();
                     RenderSystem.depthMask(false);
                 } else {
                     RenderSystem.disableBlend();

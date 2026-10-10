@@ -29,6 +29,8 @@ final class GltfGpuBuffer implements AutoCloseable {
     private int arrayObjectId = -1;
     private int indexCount;
     private long storageBytes;
+    private GltfPersistentStream persistent;
+    private boolean persistentActive;
 
     GltfGpuBuffer(VertexFormat format, BufferBuilder.RenderedBuffer rendered, int[] indices) {
         this.format = format;
@@ -40,7 +42,7 @@ final class GltfGpuBuffer implements AutoCloseable {
     }
 
     long storageBytes() {
-        return storageBytes;
+        return storageBytes + (persistent == null ? 0 : persistent.storageBytes());
     }
 
     VertexFormat format() {
@@ -48,6 +50,20 @@ final class GltfGpuBuffer implements AutoCloseable {
     }
 
     void stream(BufferBuilder.RenderedBuffer rendered, java.nio.IntBuffer indices) {
+        RenderSystem.assertOnRenderThreadOrInit();
+        persistentActive = false;
+        if (GltfPersistentStream.supported()) {
+            try {
+                if (persistent == null) persistent = new GltfPersistentStream(format);
+                if (persistent.upload(rendered.vertexBuffer(), indices)) {
+                    persistentActive = true;
+                    indexCount = indices.remaining();
+                    return;
+                }
+            } catch (RuntimeException | LinkageError exception) {
+                failPersistent(exception);
+            }
+        } else if (persistent != null) { persistent.close(); persistent = null; }
         int previousVao = GL11.glGetInteger(GL30.GL_VERTEX_ARRAY_BINDING);
         int previousBuffer = GL11.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
         try {
@@ -141,7 +157,7 @@ final class GltfGpuBuffer implements AutoCloseable {
         int timing = GltfGpuTiming.begin();
         try {
             shader.apply();
-            GlStateManager._glBindVertexArray(arrayObjectId);
+            GlStateManager._glBindVertexArray(persistentActive ? persistent.vertexArray() : arrayObjectId);
             if (instanceTexture != 0) {
                 GlStateManager._activeTexture(GL13.GL_TEXTURE0 + 8);
                 GL11.glBindTexture(GL31.GL_TEXTURE_BUFFER, instanceTexture);
@@ -151,19 +167,35 @@ final class GltfGpuBuffer implements AutoCloseable {
             }
             GltfRenderMetrics.draw(instances);
         } finally {
-            GltfGpuTiming.end(timing);
-            shader.clear();
-            GlStateManager._glBindVertexArray(previousVao);
-            BufferUploader.invalidate();
+            try {
+                if (persistentActive) {
+                    try { persistent.submitted(); }
+                    catch (RuntimeException | LinkageError exception) { failPersistent(exception); }
+                }
+                if (instanceTexture != 0) GltfInstanceBuffer.submitted(instanceTexture);
+            } finally {
+                GltfGpuTiming.end(timing);
+                shader.clear();
+                GlStateManager._glBindVertexArray(previousVao);
+                BufferUploader.invalidate();
+            }
         }
     }
 
     boolean isInvalid() {
-        return arrayObjectId < 0;
+        return arrayObjectId < 0 && !persistentActive;
+    }
+
+    private void failPersistent(Throwable exception) {
+        persistentActive = false;
+        if (persistent != null) { persistent.close(); persistent = null; }
+        GltfPersistentStream.disable(exception);
     }
 
     @Override
     public void close() {
+        if (persistent != null) { persistent.close(); persistent = null; }
+        persistentActive = false;
         if (vertexBufferId >= 0) {
             GlStateManager._glDeleteBuffers(vertexBufferId);
             vertexBufferId = -1;
@@ -176,6 +208,8 @@ final class GltfGpuBuffer implements AutoCloseable {
             GlStateManager._glDeleteVertexArrays(arrayObjectId);
             arrayObjectId = -1;
         }
+        storageBytes = 0;
+        indexCount = 0;
     }
 
     private void upload(BufferBuilder.RenderedBuffer rendered, int[] indices) {
@@ -198,6 +232,8 @@ final class GltfGpuBuffer implements AutoCloseable {
                 MemoryUtil.memFree(indexData);
             }
             indexCount = indices.length;
+            storageBytes = rendered.vertexBuffer().remaining() + (long) indexCount * Integer.BYTES;
+            GltfRenderMetrics.upload(storageBytes);
         } finally {
             GlStateManager._glBindVertexArray(previousVao);
             GlStateManager._glBindBuffer(34962, previousBuffer);

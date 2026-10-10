@@ -14,6 +14,24 @@ public final class GltfRenderMetrics {
     private static long submissions;
     private static long submitNanos;
     private static int depth;
+    private static long bufferedBulk;
+    private static long bufferedSlow;
+    private static long bufferedBytes;
+
+    static void buffered(boolean bulk, long bytes) {
+        if (bulk) bufferedBulk++; else bufferedSlow++;
+        bufferedBytes += bytes;
+    }
+
+    public static BufferedSnapshot bufferedSnapshot() {
+        return new BufferedSnapshot(bufferedBulk, bufferedSlow, bufferedBytes);
+    }
+
+    public record BufferedSnapshot(long bulk, long slow, long bytes) {
+        public BufferedSnapshot minus(BufferedSnapshot before) {
+            return new BufferedSnapshot(bulk - before.bulk, slow - before.slow, bytes - before.bytes);
+        }
+    }
 
     public static long beginSubmission() {
         return depth++ == 0 ? System.nanoTime() : 0;

@@ -6,7 +6,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.BufferUploader;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.Tesselator;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.vertex.VertexSorting;
 import me.danialisntcool.gltfapi.api.client.GltfBounds;
@@ -18,6 +18,7 @@ import me.danialisntcool.gltfapi.generated.ModMetadata;
 import net.minecraft.client.Minecraft;
 import me.danialisntcool.gltfapi.client.render.GltfShaders;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -32,6 +33,8 @@ public final class GltfGuiIconCache {
     private static final Map<Key, TextureTarget> CACHE = new LinkedHashMap<>(16, 0.75F, true);
     private static final BufferBuilder STAGING = new BufferBuilder(4096);
     private static final IconBuffers BUFFERS = new IconBuffers();
+    private static final Map<TextureTarget, RenderType> DRAW_TYPES = new java.util.IdentityHashMap<>();
+    private static final java.util.List<TextureTarget> RETIRED = new java.util.ArrayList<>();
     private static long bytes;
     private static int builds;
 
@@ -39,6 +42,10 @@ public final class GltfGuiIconCache {
     }
 
     public static void beginFrame() {
+        if (!RETIRED.isEmpty()) try (CaptureState ignored = new CaptureState(true)) {
+            for (TextureTarget target : RETIRED) target.destroyBuffers();
+            RETIRED.clear();
+        }
         builds = 0;
     }
 
@@ -55,10 +62,11 @@ public final class GltfGuiIconCache {
         RenderSystem.assertOnRenderThread();
         GltfModel model = GltfModelManager.getInstance().getModel(handle.location()).orElse(null);
         float[] color = RenderSystem.getShaderColor();
-        if (model == null || !model.supportsIconCache(context.options())
-                || GltfRenderer.isShaderPackInUse() || !GltfRenderer.isOrthographic(RenderSystem.getProjectionMatrix())
+        if (model == null || !GltfRenderer.isOrthographic(RenderSystem.getProjectionMatrix())
                 || color[0] != 1 || color[1] != 1 || color[2] != 1 || color[3] != 1
-                || !me.danialisntcool.gltfapi.client.GltfClientConfig.ICON_CACHE.get()) return false;
+                || GltfRenderer.isRenderingShadowPass()) return false;
+        boolean cacheable = model.supportsIconCache(context.options())
+                && me.danialisntcool.gltfapi.client.GltfClientConfig.ICON_CACHE.get();
         Matrix4f view = new Matrix4f(RenderSystem.getModelViewMatrix()).mul(context.poseStack().last().pose());
         Matrix4f options = context.options().transformationMatrix();
         Matrix4f mvp = new Matrix4f(RenderSystem.getProjectionMatrix()).mul(view).mul(options);
@@ -81,20 +89,23 @@ public final class GltfGuiIconCache {
                 GltfRenderer.usesBufferedPbr(context.renderMode()),
                 new Vector3f(light0.get(0), light0.get(1), light0.get(2)),
                 new Vector3f(light1.get(0), light1.get(1), light1.get(2)));
-        TextureTarget target = CACHE.get(key);
+        TextureTarget target = cacheable ? CACHE.get(key) : null;
         if (target == null) {
-            if (builds >= ModMetadata.ICON_BUILDS_PER_FRAME || ModMetadata.ICON_CACHE_ENTRIES <= 0
-                    || (long) width * height * 8 > ModMetadata.ICON_CACHE_BYTES) return false;
-            builds++;
+            cacheable &= builds < ModMetadata.ICON_BUILDS_PER_FRAME && ModMetadata.ICON_CACHE_ENTRIES > 0
+                    && (long) width * height * 8 <= ModMetadata.ICON_CACHE_BYTES;
             target = capture(handle, context, rectangle, width, height);
-            CACHE.put(key, target);
-            bytes += (long) width * height * 8;
-            trim();
+            if (cacheable) {
+                builds++;
+                CACHE.put(key, target);
+                bytes += (long) width * height * 8;
+                trim();
+            } else RETIRED.add(target);
             GltfRenderMetrics.icon(false);
         } else {
             GltfRenderMetrics.icon(true);
         }
-        draw(target, rectangle);
+        draw(target, rectangle, context.buffers());
+        if (!cacheable) DRAW_TYPES.remove(target);
         return true;
     }
 
@@ -123,6 +134,9 @@ public final class GltfGuiIconCache {
             TextureTarget target = new TextureTarget(width, height, true, Minecraft.ON_OSX);
             try {
                 target.setClearColor(0, 0, 0, 0);
+                RenderSystem.depthMask(true);
+                RenderSystem.depthFunc(GL11.GL_LEQUAL);
+                RenderSystem.enableDepthTest();
                 target.clear(Minecraft.ON_OSX);
                 target.bindWrite(true);
                 Matrix4f crop = new Matrix4f().translation(
@@ -143,33 +157,52 @@ public final class GltfGuiIconCache {
         }
     }
 
-    private static void draw(TextureTarget target, Rectangle rectangle) {
-        try (CaptureState ignored = new CaptureState(false)) {
-            RenderSystem.setProjectionMatrix(new Matrix4f(), VertexSorting.ORTHOGRAPHIC_Z);
-            RenderSystem.getModelViewStack().setIdentity();
-            RenderSystem.applyModelViewMatrix();
+    private static void draw(TextureTarget target, Rectangle rectangle, MultiBufferSource buffers) {
+        Matrix4f inverse = new Matrix4f(RenderSystem.getProjectionMatrix())
+                .mul(RenderSystem.getModelViewMatrix()).invert();
+        VertexConsumer builder = buffers.getBuffer(DRAW_TYPES.computeIfAbsent(target, GltfGuiIconCache::drawType));
+        emit(builder, inverse, rectangle.left, rectangle.bottom, rectangle.depth, 0, 0);
+        emit(builder, inverse, rectangle.right, rectangle.bottom, rectangle.depth, 1, 0);
+        emit(builder, inverse, rectangle.right, rectangle.top, rectangle.depth, 1, 1);
+        emit(builder, inverse, rectangle.left, rectangle.top, rectangle.depth, 0, 1);
+    }
+
+    static Vector3f unproject(Matrix4f inverse, float x, float y, float z) {
+        return inverse.transformProject(new Vector3f(x, y, z));
+    }
+
+    private static void emit(VertexConsumer builder, Matrix4f inverse, float x, float y, float z, float u, float v) {
+        Vector3f position = unproject(inverse, x, y, z);
+        builder.vertex(position.x, position.y, position.z).uv(u, v).endVertex();
+    }
+
+    private static RenderType drawType(TextureTarget target) {
+        java.util.ArrayDeque<GltfNativeState> states = new java.util.ArrayDeque<>();
+        return new RenderType("gltf_gui_icon", DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS,
+                256, false, false, () -> {
+            states.push(new GltfNativeState(1));
             RenderSystem.setShader(GltfShaders::iconShader);
             RenderSystem.setShaderTexture(0, target.getColorTextureId());
-            RenderSystem.enableDepthTest();
-            RenderSystem.depthMask(true);
+            RenderSystem.disableDepthTest();
+            RenderSystem.depthMask(false);
             RenderSystem.disableCull();
             RenderSystem.enableBlend();
             RenderSystem.blendFuncSeparate(GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA,
                     GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
-            BufferBuilder builder = Tesselator.getInstance().getBuilder();
-            builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
-            builder.vertex(rectangle.left, rectangle.bottom, rectangle.depth).uv(0, 0).endVertex();
-            builder.vertex(rectangle.right, rectangle.bottom, rectangle.depth).uv(1, 0).endVertex();
-            builder.vertex(rectangle.right, rectangle.top, rectangle.depth).uv(1, 1).endVertex();
-            builder.vertex(rectangle.left, rectangle.top, rectangle.depth).uv(0, 1).endVertex();
-            int timing = GltfGpuTiming.begin();
-            try {
-                BufferUploader.drawWithShader(builder.end());
-                GltfRenderMetrics.draw(1);
-            } finally {
-                GltfGpuTiming.end(timing);
+        }, () -> states.pop().close()) {
+            @Override
+            public void end(BufferBuilder builder, VertexSorting sorting) {
+                if (!builder.building()) return;
+                var rendered = builder.end();
+                setupRenderState();
+                try {
+                    BufferUploader.drawWithShader(rendered);
+                    GltfRenderMetrics.draw(1);
+                } finally {
+                    clearRenderState();
+                }
             }
-        }
+        };
     }
 
     private static void trim() {
@@ -178,13 +211,20 @@ public final class GltfGuiIconCache {
             TextureTarget target = iterator.next().getValue();
             iterator.remove();
             bytes -= (long) target.width * target.height * 8;
-            target.destroyBuffers();
+            DRAW_TYPES.remove(target);
+            RETIRED.add(target);
         }
     }
 
     public static void clear() {
-        for (TextureTarget target : CACHE.values()) target.destroyBuffers();
-        CACHE.clear();
+        if (!CACHE.isEmpty() || !RETIRED.isEmpty()) try (CaptureState ignored = new CaptureState(true)) {
+            for (TextureTarget target : CACHE.values()) target.destroyBuffers();
+            CACHE.clear();
+            DRAW_TYPES.clear();
+            for (TextureTarget target : RETIRED) target.destroyBuffers();
+            RETIRED.clear();
+        }
+        DRAW_TYPES.clear();
         bytes = 0;
         builds = 0;
     }
@@ -237,12 +277,15 @@ public final class GltfGuiIconCache {
             RenderSystem.applyModelViewMatrix();
             RenderSystem.setProjectionMatrix(projection, sorting);
             if (capture) {
-            GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, drawTarget);
-            GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, readTarget);
-            GlStateManager._viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
-            if (scissor) GlStateManager._enableScissorTest(); else GlStateManager._disableScissorTest();
-            GlStateManager._clearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
-            GlStateManager._clearDepth(clearDepth);
+                Minecraft minecraft = Minecraft.getInstance();
+                if (minecraft != null && minecraft.getMainRenderTarget().frameBufferId == drawTarget)
+                    minecraft.getMainRenderTarget().bindWrite(false);
+                else GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, drawTarget);
+                GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, readTarget);
+                GlStateManager._viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+                if (scissor) GlStateManager._enableScissorTest(); else GlStateManager._disableScissorTest();
+                GlStateManager._clearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
+                GlStateManager._clearDepth(clearDepth);
             }
             nativeState.close();
         }

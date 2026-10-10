@@ -61,6 +61,7 @@ public final class GltfSceneProfiler {
             active.measuredAt = now;
             active.lastFrame = now;
             active.before = GltfRenderMetrics.snapshot();
+            active.bufferedBefore = GltfRenderMetrics.bufferedSnapshot();
             active.shadersOn = GltfRenderer.isShaderPackInUse();
             active.shadersOff = !active.shadersOn;
             GltfGpuTiming.start();
@@ -86,22 +87,26 @@ public final class GltfSceneProfiler {
             return 0;
         }
         GltfRenderMetrics.Snapshot counts = GltfRenderMetrics.snapshot().minus(active.before);
+        var buffered = GltfRenderMetrics.bufferedSnapshot().minus(active.bufferedBefore);
         var gpu = GltfGpuTiming.snapshot();
         long[] sorted = active.frameTimes.toLongArray();
         Arrays.sort(sorted);
         double frames = active.frames;
         String result = String.format(Locale.ROOT,
-                "glTF real-scene profile | shaders %s | %,d frames | %.1f FPS | frame avg %.2f ms | p95 %.2f ms | p99 %.2f ms | API CPU %.3f ms/frame | covered GPU %s | draws %.1f/frame | instanced %.1f/frame | uploads %.3f MiB/frame | CPU transformed %.1f vertices/frame | pose hits %.1f/frame | buffer reuses %.1f/frame | icon hits %.1f/frame | icon builds %.1f/frame | culled %.1f/frame | API requests %.1f/frame | GPU samples %,d | pending %d | dropped %,d",
+                "glTF real-scene profile | shaders %s | %,d frames | %.1f FPS | frame avg %.2f ms | p95 %.2f ms | p99 %.2f ms | API submit %.3f ms/frame | covered GPU %s | API draws %.1f/frame | instanced %.1f/frame | API uploads %.3f MiB/frame | CPU transformed %.1f vertices/frame | pose hits %.1f/frame | buffer reuses %.1f/frame | icon hits %.1f/frame | icon builds %.1f/frame | culled %.1f/frame | API requests %.1f/frame | GPU samples %,d | pending %d | dropped %,d",
                 active.shadersOn && active.shadersOff ? "mixed" : active.shadersOn ? "on" : "off",
                 active.frames, 1_000_000_000.0 * frames / active.frameNanos,
                 active.frameNanos / frames / 1_000_000.0, percentile(sorted, 0.95), percentile(sorted, 0.99),
                 counts.submitNanos() / frames / 1_000_000.0,
-                gpu.supported() ? String.format(Locale.ROOT, "%.3f ms/frame", gpu.nanos() / frames / 1_000_000.0) : "unavailable",
+                gpu.supported() && gpu.samples() > 0 ? String.format(Locale.ROOT, "%.3f ms/frame", gpu.nanos() / frames / 1_000_000.0) : "unavailable",
                 counts.draws() / frames, counts.instancedDraws() / frames,
                 counts.uploadedBytes() / frames / 1_048_576.0, counts.transformedVertices() / frames,
                 counts.poseCacheHits() / frames, counts.bufferReuses() / frames,
                 counts.iconHits() / frames, counts.iconBuilds() / frames, counts.culled() / frames,
                 counts.submissions() / frames, gpu.samples(), gpu.pending(), gpu.dropped());
+        result += String.format(Locale.ROOT,
+                " | caller-buffer bulk %.1f/frame | fallback %.1f/frame | copied %.3f MiB/frame | caller-buffer GPU/draws not measured",
+                buffered.bulk() / frames, buffered.slow() / frames, buffered.bytes() / frames / 1_048_576.0);
         LogUtils.getLogger().info(result);
         message(result);
         GltfGpuTiming.clear();
@@ -126,6 +131,7 @@ public final class GltfSceneProfiler {
         private long frameNanos;
         private long frames;
         private GltfRenderMetrics.Snapshot before;
+        private GltfRenderMetrics.BufferedSnapshot bufferedBefore;
         private boolean shadersOn;
         private boolean shadersOff;
 

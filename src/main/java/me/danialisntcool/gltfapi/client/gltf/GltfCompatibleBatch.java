@@ -149,6 +149,8 @@ public final class GltfCompatibleBatch implements AutoCloseable {
     private static final class GeometryGroup {
         private final Geometry geometry;
         private final List<GltfGpuBuffer> buffers = new ArrayList<>();
+        private final List<CachedCall> cachedCalls = new ArrayList<>();
+        private boolean streaming;
 
         private GeometryGroup(VertexFormat format) {
             geometry = new Geometry(format);
@@ -156,7 +158,30 @@ public final class GltfCompatibleBatch implements AutoCloseable {
 
         private void add(GltfPrimitive primitive, GltfDeformedGeometry deformedGeometry,
                          Matrix4f transform, int packedLight, int packedOverlay, boolean pbr) {
-            int requiredVertices = primitive.positions().length / 3;
+            boolean shaders = GltfShaderPackCompat.isShaderPackInUse() || GltfShaderPackCompat.isRenderingShadowPass();
+            if (!streaming && shaders && !pbr && GltfShaderGeometryCache.canCache(primitive)
+                    && me.danialisntcool.gltfapi.client.GltfClientConfig.SHADER_GEOMETRY_CACHE.get()) {
+                cachedCalls.add(new CachedCall(primitive, deformedGeometry, transform, packedLight, packedOverlay));
+                if (cachedCalls.size() <= 32) return;
+                streaming = true;
+                for (CachedCall call : cachedCalls) addStreaming(call.primitive, call.geometry, call.transform,
+                        call.light, call.overlay, false);
+                cachedCalls.clear();
+                return;
+            }
+            if (!cachedCalls.isEmpty()) {
+                streaming = true;
+                for (CachedCall call : cachedCalls) addStreaming(call.primitive, call.geometry, call.transform,
+                        call.light, call.overlay, false);
+                cachedCalls.clear();
+            }
+            addStreaming(primitive, deformedGeometry, transform, packedLight, packedOverlay, pbr);
+        }
+
+        private void addStreaming(GltfPrimitive primitive, GltfDeformedGeometry deformedGeometry,
+                                  Matrix4f transform, int packedLight, int packedOverlay, boolean pbr) {
+            boolean shaders = GltfShaderPackCompat.isShaderPackInUse() || GltfShaderPackCompat.isRenderingShadowPass();
+            int requiredVertices = shaders ? primitive.indices().length : primitive.positions().length / 3;
             if (!geometry.canFit(requiredVertices)) {
                 buffers.add(geometry.upload(true));
             }
@@ -174,6 +199,10 @@ public final class GltfCompatibleBatch implements AutoCloseable {
                     throw new IllegalStateException("The active glTF compatibility RenderType has no shader | Support: "
                             + GltfRendererApi.SUPPORT_URL);
                 }
+                for (CachedCall call : cachedCalls) {
+                    GltfShaderGeometryCache.draw(call.primitive, call.geometry, call.transform,
+                            call.light, call.overlay, shader);
+                }
                 for (GltfGpuBuffer buffer : buffers) {
                     buffer.drawWithShader(RenderSystem.getModelViewMatrix(),
                             RenderSystem.getProjectionMatrix(), shader);
@@ -185,6 +214,8 @@ public final class GltfCompatibleBatch implements AutoCloseable {
         }
 
         private void reset() {
+            cachedCalls.clear();
+            streaming = false;
             for (GltfGpuBuffer buffer : buffers) GltfGpuBufferPool.release(buffer.format(), buffer);
             buffers.clear();
             if (geometry.vertices.building()) geometry.vertices.end().release();
@@ -240,13 +271,15 @@ public final class GltfCompatibleBatch implements AutoCloseable {
             Vector3f position = new Vector3f();
             Vector3f normal = new Vector3f();
             int baseVertex = vertexCount;
-            int sourceVertexCount = positions.length / 3;
-            ByteBuffer packed = GltfShaderPackCompat.isShaderPackInUse() || GltfShaderPackCompat.isRenderingShadowPass()
+            boolean shaders = GltfShaderPackCompat.isShaderPackInUse() || GltfShaderPackCompat.isRenderingShadowPass();
+            int sourceVertexCount = shaders ? primitive.indices().length : positions.length / 3;
+            ByteBuffer packed = shaders
                     ? null : GltfStreamWriter.indexed(primitive, geometry, transform, normalTransform,
                     packedLight, packedOverlay, pbr);
             if (packed != null) {
                 vertices.putBulkData(packed);
-            } else for (int index = 0; index < sourceVertexCount; index++) {
+            } else for (int vertex = 0; vertex < sourceVertexCount; vertex++) {
+                int index = shaders ? primitive.indices()[vertex] : vertex;
                 int vectorOffset = index * 3;
                 int textureOffset = index * 2;
                 int colorOffset = index * 4;
@@ -272,9 +305,8 @@ public final class GltfCompatibleBatch implements AutoCloseable {
                 }
                 vertices.endVertex();
             }
-            for (int index : primitive.indices()) {
-                indices.add(baseVertex + index);
-            }
+            if (shaders) for (int vertex = 0; vertex < sourceVertexCount; vertex++) indices.add(baseVertex + vertex);
+            else for (int index : primitive.indices()) indices.add(baseVertex + index);
             vertexCount += sourceVertexCount;
             GltfRenderMetrics.stream(sourceVertexCount, sourceVertexCount);
             peakBytes = Math.max(peakBytes, vertexCount * format.getVertexSize());
@@ -304,6 +336,10 @@ public final class GltfCompatibleBatch implements AutoCloseable {
             }
             return buffer;
         }
+    }
+
+    private record CachedCall(GltfPrimitive primitive, GltfDeformedGeometry geometry, Matrix4f transform,
+                              int light, int overlay) {
     }
 
     private record TransparentCall(GltfModel model, GltfRenderState state, GltfPrimitive primitive,

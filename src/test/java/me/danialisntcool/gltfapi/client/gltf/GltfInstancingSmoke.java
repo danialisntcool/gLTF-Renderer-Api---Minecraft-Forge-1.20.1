@@ -13,7 +13,8 @@ import org.lwjgl.system.MemoryStack;
 import java.nio.ByteBuffer;
 
 public final class GltfInstancingSmoke {
-    public static void verify(String vertexSource) {
+    public static void verify(String vertexSource) throws Exception {
+        long baseline = GltfPersistentStream.allocatedBytes();
         int vertex = compile(GL20.GL_VERTEX_SHADER, vertexSource);
         int fragment = compile(GL20.GL_FRAGMENT_SHADER, """
                 #version 150
@@ -88,15 +89,34 @@ public final class GltfInstancingSmoke {
                     0x00f000f0, 0x000a0000, instance, new Matrix3f());
             System.arraycopy(instance, 0, data, 32, 32);
             GL13.glActiveTexture(GL13.GL_TEXTURE0 + 8);
-            int texture = GltfInstanceBuffer.upload(data, data.length);
-            if (texture != GltfInstanceBuffer.upload(data, data.length)) {
-                throw new IllegalStateException("Instance texture was recreated during an update");
-            }
-            GL11.glBindTexture(GL31.GL_TEXTURE_BUFFER, texture);
             GL11.glViewport(0, 0, 64, 64);
             GL11.glClearColor(0, 0, 0, 1);
-            GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
-            GL31.glDrawElementsInstanced(GL11.GL_TRIANGLES, 3, GL11.GL_UNSIGNED_INT, 0, 2);
+            int texture = 0;
+            var active = GltfInstanceBuffer.class.getDeclaredField("persistentActive");
+            active.setAccessible(true);
+            var budget = GltfPersistentStream.class.getDeclaredField("allocatedBytes");
+            budget.setAccessible(true);
+            for (int pass = 0; pass < 9; pass++) {
+                int previousTexture = GL11.glGetInteger(GL31.GL_TEXTURE_BINDING_BUFFER);
+                int previousBuffer = GL11.glGetInteger(GL31.GL_TEXTURE_BUFFER);
+                long reserved = GltfPersistentStream.allocatedBytes();
+                if (pass == 0) budget.setLong(null, me.danialisntcool.gltfapi.generated.ModMetadata.GPU_STREAM_CACHE_BYTES);
+                int selected;
+                try { selected = GltfInstanceBuffer.upload(data, data.length); }
+                finally { if (pass == 0) budget.setLong(null, reserved); }
+                if (texture != 0 && selected != texture)
+                    throw new IllegalStateException("Instance texture was recreated during an update");
+                if (active.getBoolean(null) != (pass != 0 && GltfPersistentStream.supported())
+                        || GL11.glGetInteger(GL31.GL_TEXTURE_BINDING_BUFFER) != previousTexture
+                        || GL11.glGetInteger(GL31.GL_TEXTURE_BUFFER) != previousBuffer)
+                    throw new IllegalStateException("Instance streaming changed caller bindings or selected the wrong backend");
+                texture = selected;
+                GL11.glBindTexture(GL31.GL_TEXTURE_BUFFER, texture);
+                GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
+                GL31.glDrawElementsInstanced(GL11.GL_TRIANGLES, 3, GL11.GL_UNSIGNED_INT, 0, 2);
+                GltfInstanceBuffer.submitted(texture);
+                GL11.glFinish();
+            }
             var pixel = stack.mallocFloat(4);
             GL11.glReadPixels(16, 32, 1, 1, GL11.GL_RGBA, GL11.GL_FLOAT, pixel);
             float left = pixel.get(0);
@@ -109,7 +129,7 @@ public final class GltfInstancingSmoke {
             }
             int error = GL11.glGetError();
             if (error != 0) throw new IllegalStateException("Instancing GL error " + error);
-            System.out.println("Native instancing GPU regression passed: distinct poses/light and reused texture buffer");
+            System.out.println("Native instancing GPU regression passed: distinct poses/light, automatic persistent reuse, budget fallback and restored bindings");
         } finally {
             GltfInstanceBuffer.clear();
             GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
@@ -124,6 +144,8 @@ public final class GltfInstancingSmoke {
             GL20.glDeleteShader(vertex);
             GL20.glDeleteShader(fragment);
         }
+        if (GltfPersistentStream.allocatedBytes() != baseline)
+            throw new IllegalStateException("Instance streaming did not release mapped allocations on reload");
     }
 
     private static int compile(int type, String source) {
